@@ -1,494 +1,314 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from '../../App';
-import { STATIONS, GARBAGE_TYPES } from '../../data/mockData';
+// cat > /home/claude/grwms/src/pages/vendor/VendorPortal.jsx << 'VENDOREOF'
+import React, { useState, useEffect } from 'react';
+import { useApp, bus } from '../../App';
+import { Sidebar } from '../../components/Sidebar';
+import { ComplaintCard, VendorComplaintModal } from '../../components/ComplaintCard';
+import { KPI, ProgressBar, NotifBanner } from '../../components/UI';
+import { Badge } from '../../components/ComplaintCard';
 import LiveMap from '../../components/LiveMap';
-import { timeAgo } from '../../utils/helpers';
+import { CLEANERS } from '../../data/mockData';
+import { timeAgo, calcResolutionRate, avgResolutionTime } from '../../utils/helpers';
 import {
-  Camera, MapPin, Send, ChevronLeft, CheckCircle2, AlertTriangle,
-  Trash2, Recycle, Package, FlaskConical, Droplets, Zap,
-  Clock, Navigation, Image, X, RotateCcw, ZoomIn
+  CheckCircle2, Navigation2, BarChart2, ListChecks, MapPin,
+  UserCheck, Bell, Clock, AlertTriangle, Users
 } from 'lucide-react';
 
-/* ── design tokens ── */
 const C = {
-  navy: '#0A1628', blue: '#1565C0', blue2: '#1976D2', blueL: '#E3F2FD',
-  green: '#2E7D32', greenL: '#E8F5E9', red: '#B71C1C', redL: '#FFEBEE',
-  amber: '#E65100', amberL: '#FFF3E0', gray: '#546E7A', grayL: '#ECEFF1',
-  text: '#0D1117', text2: '#3D4F61', text3: '#7A8FA6',
-  white: '#fff', surface: '#F7F9FC', border: '#DDE3E9',
+  navy:'#0A1628',blue:'#1565C0',blueL:'#E3F2FD',green:'#2E7D32',greenL:'#E8F5E9',
+  red:'#B71C1C',redL:'#FFEBEE',amber:'#E65100',amberL:'#FFF3E0',purple:'#4527A0',
+  gray:'#546E7A',grayL:'#ECEFF1',text:'#0D1117',text2:'#3D4F61',text3:'#7A8FA6',
+  white:'#fff',surface:'#F7F9FC',border:'#DDE3E9',
 };
 
-const GTYPE_ICONS = { 'Plastic Waste': Trash2, 'Food Waste': Package, 'Abandoned Item': Package, 'Chemical Spill': FlaskConical, 'Recyclable': Recycle, 'Sewage / Water': Droplets };
-
-/* ── reusable ── */
-const TopBar = ({ title, onBack, right }) => (
-  <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 16px', borderBottom:`1px solid ${C.border}`, background:C.white, flexShrink:0 }}>
-    {onBack && (
-      <button onClick={onBack} style={{ width:34, height:34, borderRadius:'50%', background:C.surface, border:`1px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-        <ChevronLeft size={18} color={C.text2}/>
-      </button>
-    )}
-    <span style={{ fontSize:15, fontWeight:700, flex:1, color:C.text }}>{title}</span>
-    {right}
-  </div>
-);
-
-const PrimaryBtn = ({ children, onClick, disabled, icon: Icon, color=C.blue }) => (
+const Btn = ({ children, onClick, color=C.blue, outline=false, sm=false, Icon, disabled=false }) => (
   <button onClick={onClick} disabled={disabled} style={{
-    width:'100%', background:disabled?C.grayL:color, color:disabled?C.gray:C.white,
-    padding:'14px', borderRadius:12, fontSize:15, fontWeight:700,
-    border:'none', cursor:disabled?'not-allowed':'pointer',
-    display:'flex', alignItems:'center', justifyContent:'center', gap:9,
-    transition:'all .15s', boxShadow:disabled?'none':`0 2px 12px ${color}55`,
+    padding:sm?'6px 11px':'8px 15px', borderRadius:9, fontSize:sm?11.5:13, fontWeight:600, cursor:disabled?'not-allowed':'pointer',
+    background:disabled?C.grayL:outline?C.white:color, color:disabled?C.gray:outline?color:C.white,
+    border:outline?`1px solid ${color}`:'none', transition:'all .15s',
+    display:'inline-flex', alignItems:'center', gap:5, opacity:disabled?.6:1,
   }}>
-    {Icon && <Icon size={18}/>}
-    {children}
+    {Icon && <Icon size={sm?12:14}/>} {children}
   </button>
 );
 
-const StatusBadge = ({ status }) => {
-  const map = {
-    NEW:{ bg:C.amberL, color:C.amber, label:'Pending' },
-    ACCEPTED:{ bg:C.blueL, color:C.blue, label:'Accepted' },
-    IN_PROGRESS:{ bg:'#EDE7F6', color:'#4527A0', label:'In Progress' },
-    COMPLETED:{ bg:C.greenL, color:C.green, label:'Done' },
-    QUERIED:{ bg:'#FFF8E1', color:'#F57F17', label:'Queried' },
-    ESCALATED:{ bg:C.redL, color:C.red, label:'Escalated' },
-  };
-  const m = map[status] || map.NEW;
-  return <span style={{ background:m.bg, color:m.color, padding:'3px 10px', borderRadius:99, fontSize:11, fontWeight:700 }}>{m.label}</span>;
-};
-
-/* ═══ SCREEN 1: MAP HOME ═══ */
-function MapHome({ onReport, myReports }) {
+/* ─── ASSIGN CLEANER MODAL ─── */
+function AssignCleanerModal({ complaint, onClose, onAssign }) {
+  const myCleaners = CLEANERS.filter(c => c.vendorId === 'v1' && c.active);
   return (
-    <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
-      {/* header */}
-      <div style={{ background:`linear-gradient(135deg,${C.navy} 0%,${C.blue} 100%)`, padding:'14px 18px 12px', flexShrink:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-          <div style={{ width:22, height:15, borderRadius:2, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0 }}>
-            <div style={{ flex:1, background:'#FF9933' }}/><div style={{ flex:1, background:'#fff' }}/><div style={{ flex:1, background:'#138808' }}/>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:400,padding:0}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.white,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:480,padding:'0 0 24px',boxShadow:'0 -4px 30px rgba(0,0,0,.15)'}}>
+        <div style={{width:36,height:4,background:C.border,borderRadius:99,margin:'10px auto 0'}}/>
+        <div style={{padding:'14px 20px 12px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:800}}>Assign Cleaner</div>
+            <div style={{fontSize:12,color:C.text3}}>Task: {complaint.id} — {complaint.area}</div>
           </div>
-          <span style={{ color:'rgba(255,255,255,.65)', fontSize:10, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>Indian Railways · Swachh Rail</span>
+          <button onClick={onClose} style={{background:C.surface,border:'none',borderRadius:'50%',width:28,height:28,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>✕</button>
         </div>
-        <div style={{ color:'#fff', fontSize:18, fontWeight:800, marginBottom:2 }}>Spot garbage? Report instantly.</div>
-        <div style={{ color:'rgba(255,255,255,.55)', fontSize:11.5 }}>No login needed · GPS auto-captured</div>
-      </div>
 
-      {/* live map */}
-      <div style={{ flex:1, position:'relative', minHeight:200 }}>
-        <LiveMap complaints={myReports} center={[28.6139,77.2090]} zoom={12} height="100%"/>
-        <button onClick={onReport} style={{
-          position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)',
-          background:C.blue, color:C.white, padding:'13px 28px',
-          borderRadius:99, fontWeight:800, fontSize:15, border:'none',
-          cursor:'pointer', boxShadow:`0 4px 20px ${C.blue}66`,
-          display:'flex', alignItems:'center', gap:8, whiteSpace:'nowrap', zIndex:500,
-        }}>
-          <Camera size={20}/> Report Garbage
-        </button>
-      </div>
-
-      {/* recent strip */}
-      <div style={{ background:C.white, borderTop:`1px solid ${C.border}`, padding:'12px 16px', maxHeight:190, overflowY:'auto', flexShrink:0 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:8 }}>
-          Your Reports ({myReports.length})
-        </div>
-        {myReports.length===0 && (
-          <div style={{ fontSize:12, color:C.text3, textAlign:'center', padding:'10px 0', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-            <MapPin size={14} color={C.text3}/> Tap the button to make your first report
+        {/* captured complaint photo */}
+        {complaint.photoURL && (
+          <div style={{margin:'12px 20px 0',borderRadius:10,overflow:'hidden',height:90}}>
+            <img src={complaint.photoURL} alt="complaint" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
           </div>
         )}
-        {myReports.map(r=>(
-          <div key={r.id} style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 0', borderBottom:`1px solid ${C.border}` }}>
-            {/* thumbnail */}
-            <div style={{ width:42, height:42, borderRadius:8, overflow:'hidden', flexShrink:0, border:`1px solid ${C.border}`, background:C.surface }}>
-              {r.photoURL
-                ? <img src={r.photoURL} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-                : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}><Image size={16} color={C.text3}/></div>
-              }
-            </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:10, fontFamily:'monospace', color:C.text3 }}>{r.id}</div>
-              <div style={{ fontSize:12.5, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{r.gtype} — {r.area}</div>
-              <div style={{ fontSize:11, color:C.text3, display:'flex', alignItems:'center', gap:4 }}>
-                <Clock size={10}/> {timeAgo(r.reportedAt)}
-                <MapPin size={10} style={{marginLeft:4}}/> {r.station?.name?.split(' ')[0]}
+
+        <div style={{padding:'12px 20px 0'}}>
+          <div style={{fontSize:12,color:C.text3,marginBottom:10}}>Select an active cleaner to assign this task:</div>
+          {myCleaners.map(cl=>(
+            <div key={cl.id} onClick={()=>onAssign(complaint.id, cl)}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',marginBottom:8,transition:'background .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.background=C.blueL}
+              onMouseLeave={e=>e.currentTarget.style.background=''}>
+              <div style={{width:36,height:36,borderRadius:'50%',background:`linear-gradient(135deg,${C.blue},${C.purple})`,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0}}>
+                {cl.name.split(' ').map(w=>w[0]).join('')}
               </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:13}}>{cl.name}</div>
+                <div style={{fontSize:11.5,color:C.text3}}>{cl.area} · {cl.phone}</div>
+              </div>
+              <UserCheck size={16} color={C.green}/>
             </div>
-            <StatusBadge status={r.status}/>
-          </div>
-        ))}
-      </div>
-
-      {/* bottom nav */}
-      <div style={{ background:C.white, borderTop:`1px solid ${C.border}`, display:'flex', flexShrink:0 }}>
-        {[{Icon:MapPin,l:'Map',on:true},{Icon:Image,l:'Reports'},{Icon:Navigation,l:'Help'}].map(b=>(
-          <button key={b.l} style={{ flex:1, padding:'9px 4px', textAlign:'center', cursor:'pointer', border:'none', background:'none' }}>
-            <b.Icon size={20} color={b.on?C.blue:C.text3} style={{ display:'block', margin:'0 auto 2px' }}/>
-            <span style={{ fontSize:9.5, fontWeight:700, color:b.on?C.blue:C.text3 }}>{b.l}</span>
-          </button>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ═══ SCREEN 2: CAMERA ═══ */
-function CameraScreen({ onCapture, onBack }) {
-  const videoRef   = useRef(null);
-  const canvasRef  = useRef(null);
-  const streamRef  = useRef(null);
-  const [gps,      setGps]      = useState(null);
-  const [camReady, setCamReady] = useState(false);
-  const [camErr,   setCamErr]   = useState(null);
-  const [facing,   setFacing]   = useState('environment'); // rear camera default
-  const [flash,    setFlash]    = useState(false);
-
-  // Start camera
-  const startCamera = useCallback(async (facingMode) => {
-    try {
-      if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width:{ ideal:1920 }, height:{ ideal:1080 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCamReady(true);
-        setCamErr(null);
-      }
-    } catch(e) {
-      setCamErr(e.name === 'NotAllowedError'
-        ? 'Camera permission denied. Please allow camera access in your browser settings.'
-        : 'Camera not available on this device or browser.');
-    }
-  }, []);
-
-  useEffect(() => {
-    startCamera(facing);
-    // GPS
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        p => setGps({ lat: p.coords.latitude.toFixed(5), lng: p.coords.longitude.toFixed(5) }),
-        () => setGps({ lat:'28.63150', lng:'77.21670' }), // demo fallback
-        { timeout:6000 }
-      );
-    } else {
-      setGps({ lat:'28.63150', lng:'77.21670' });
-    }
-    return () => { if (streamRef.current) streamRef.current.getTracks().forEach(t=>t.stop()); };
-  }, []);
-
-  const flipCamera = async () => {
-    const next = facing==='environment'?'user':'environment';
-    setFacing(next);
-    await startCamera(next);
-  };
-
-  const shoot = () => {
-    if (!camReady || !canvasRef.current || !videoRef.current) return;
-    setFlash(true);
-    setTimeout(()=>setFlash(false), 180);
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width  = video.videoWidth  || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext('2d');
-    // Mirror if selfie
-    if (facing==='user') { ctx.translate(canvas.width,0); ctx.scale(-1,1); }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataURL = canvas.toDataURL('image/jpeg', 0.88);
-    // Stop camera
-    if (streamRef.current) streamRef.current.getTracks().forEach(t=>t.stop());
-    onCapture(dataURL, gps);
-  };
-
+/* ─── TASK INBOX ─── */
+function TaskInbox({ tasks, onAction, onSelect, onAssignCleaner }) {
+  const active = tasks.filter(c => !['COMPLETED','REJECTED'].includes(c.status));
   return (
-    <div style={{ display:'flex', flexDirection:'column', flex:1, background:'#000', overflow:'hidden' }}>
-      <canvas ref={canvasRef} style={{ display:'none' }}/>
-
-      {/* top controls */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', position:'absolute', top:0, left:0, right:0, zIndex:10, background:'linear-gradient(to bottom,rgba(0,0,0,.6),transparent)' }}>
-        <button onClick={onBack} style={{ width:36, height:36, borderRadius:'50%', background:'rgba(0,0,0,.4)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-          <X size={18} color="#fff"/>
-        </button>
-        <div style={{ display:'flex', alignItems:'center', gap:6, background:gps?'rgba(46,125,50,.8)':'rgba(21,101,192,.8)', padding:'5px 12px', borderRadius:99 }}>
-          <MapPin size={13} color="#fff"/>
-          <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{gps ? `${gps.lat}°N` : 'Getting GPS…'}</span>
-        </div>
-        <button onClick={flipCamera} style={{ width:36, height:36, borderRadius:'50%', background:'rgba(0,0,0,.4)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-          <RotateCcw size={16} color="#fff"/>
-        </button>
+    <>
+      <div className="page-hd">
+        <div className="page-title">My Tasks</div>
+        <div className="page-sub">Nagpur Railway Stations · {new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}</div>
       </div>
-
-      {/* viewfinder */}
-      <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
-        {/* flash overlay */}
-        {flash && <div style={{ position:'absolute', inset:0, background:'#fff', zIndex:20, opacity:.8, transition:'opacity .15s' }}/>}
-
-        {camErr ? (
-          <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24, gap:12 }}>
-            <AlertTriangle size={40} color="#E65100"/>
-            <div style={{ color:'#fff', textAlign:'center', fontSize:14, lineHeight:1.6 }}>{camErr}</div>
-          </div>
-        ) : (
-          <>
-            <video ref={videoRef} playsInline muted style={{ width:'100%', height:'100%', objectFit:'cover', transform: facing==='user'?'scaleX(-1)':'none' }}/>
-            {/* corner guides */}
-            {[{t:16,l:16,bt:'3px 0 0 3px',br:'4px 0 0 0'},{t:16,r:16,bt:'3px 3px 0 0',br:'0 4px 0 0'},{b:16,l:16,bt:'0 0 3px 3px',br:'0 0 0 4px'},{b:16,r:16,bt:'0 3px 3px 0',br:'0 0 4px 0'}].map((g,i)=>(
-              <div key={i} style={{ position:'absolute', width:44, height:44, borderColor:'rgba(255,255,255,.75)', borderStyle:'solid', borderWidth:g.bt, borderRadius:g.br, top:g.t, left:g.l, right:g.r, bottom:g.b }}/>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))',gap:10,marginBottom:16}}>
+        <KPI label="Total"  value={tasks.length}/>
+        <KPI label="New"    value={tasks.filter(c=>c.status==='NEW').length}          color={C.amber}/>
+        <KPI label="Active" value={tasks.filter(c=>c.status==='IN_PROGRESS').length}  color={C.blue}/>
+        <KPI label="Done"   value={tasks.filter(c=>c.status==='COMPLETED').length}    color={C.green}/>
+      </div>
+      {active.length===0
+        ? <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:36,textAlign:'center',color:C.text3}}>🎉 All tasks completed for today!</div>
+        : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:14}}>
+            {active.map(c=>(
+              <ComplaintCard key={c.id} complaint={c} onClick={()=>onSelect(c)} actions={<>
+                {c.status==='NEW'&&<Btn onClick={e=>{e.stopPropagation();onAction(c.id,'ACCEPTED');}} color={C.blue} Icon={CheckCircle2} sm>Accept</Btn>}
+                {c.status==='ACCEPTED'&&!c.assignedTo&&<Btn onClick={e=>{e.stopPropagation();onAssignCleaner(c);}} color={C.purple} Icon={UserCheck} sm>Assign Cleaner</Btn>}
+                {c.status==='ACCEPTED'&&c.assignedTo&&<Btn onClick={e=>{e.stopPropagation();onAction(c.id,'IN_PROGRESS');}} color={C.purple} outline sm Icon={Navigation2}>Start</Btn>}
+                {c.status==='IN_PROGRESS'&&<Btn onClick={e=>{e.stopPropagation();onAction(c.id,'COMPLETED');}} color={C.green} Icon={CheckCircle2} sm>Mark Done</Btn>}
+                <Btn onClick={e=>{e.stopPropagation();onSelect(c);}} outline color={C.gray} sm>Details</Btn>
+              </>}/>
             ))}
-          </>
-        )}
-
-        {/* mini GPS map preview bottom-left */}
-        {gps && (
-          <div style={{ position:'absolute', bottom:12, left:12, width:110, height:80, borderRadius:8, overflow:'hidden', border:'2px solid rgba(255,255,255,.4)', zIndex:5 }}>
-            <LiveMap singlePin singleCoords={gps} height="80px" zoom={15}/>
           </div>
-        )}
-      </div>
-
-      {/* shutter bar */}
-      <div style={{ background:'#111', padding:'20px 24px 28px', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <div style={{ width:36 }}/>
-        {/* shutter */}
-        <button onClick={shoot} disabled={!camReady || !!camErr}
-          style={{ width:72, height:72, borderRadius:'50%', background:C.white, border:`4px solid rgba(255,255,255,.35)`, cursor:camReady?'pointer':'not-allowed', display:'flex', alignItems:'center', justifyContent:'center', transition:'transform .1s', padding:0 }}
-          onMouseDown={e=>e.currentTarget.style.transform='scale(.9)'}
-          onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
-        >
-          <div style={{ width:56, height:56, borderRadius:'50%', background:camReady?C.white:'#555', border:`3px solid ${C.border}` }}/>
-        </button>
-        <button onClick={flipCamera} style={{ width:36, height:36, borderRadius:'50%', background:'rgba(255,255,255,.1)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-          <RotateCcw size={18} color="rgba(255,255,255,.7)"/>
-        </button>
-      </div>
-    </div>
+      }
+    </>
   );
 }
 
-/* ═══ SCREEN 3: TYPE PICKER ═══ */
-function PickerScreen({ photoURL, onSelect, onBack }) {
-  const [sel, setSel] = useState(null);
+/* ─── CLEANERS TAB ─── */
+function CleanersTab({ tasks }) {
+  const myCleaners = CLEANERS.filter(c => c.vendorId === 'v1');
   return (
-    <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
-      <TopBar title="What did you photograph?" onBack={onBack}/>
-
-      {/* captured photo strip */}
-      <div style={{ height:120, background:'#000', flexShrink:0, position:'relative', overflow:'hidden' }}>
-        <img src={photoURL} alt="captured" style={{ width:'100%', height:'100%', objectFit:'cover', opacity:.6 }}/>
-        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ background:'rgba(0,0,0,.6)', color:'#fff', padding:'5px 12px', borderRadius:99, fontSize:11, fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
-            <Image size={13}/> Photo captured — now classify it
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding:'10px 14px 6px', color:C.text3, fontSize:12.5, flexShrink:0 }}>Select the closest match:</div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, padding:14, overflowY:'auto', flex:1 }}>
-        {GARBAGE_TYPES.map(g => {
-          const Icon = GTYPE_ICONS[g.label] || Trash2;
+    <>
+      <div className="page-hd"><div className="page-title">My Cleaners</div><div className="page-sub">Staff assigned to your zones</div></div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:14}}>
+        {myCleaners.map(cl=>{
+          const assigned = tasks.filter(t=>t.assignedTo===cl.name);
+          const done     = assigned.filter(t=>t.cleanerStatus==='DONE');
           return (
-            <div key={g.id} onClick={()=>setSel(g.id)}
-              style={{ background:sel===g.id?C.blueL:C.surface, border:`2px solid ${sel===g.id?C.blue:C.border}`, borderRadius:14, padding:'14px 8px', textAlign:'center', cursor:'pointer', transition:'all .15s' }}>
-              <Icon size={28} color={sel===g.id?C.blue:C.gray} style={{ margin:'0 auto 8px', display:'block' }}/>
-              <div style={{ fontSize:11, fontWeight:700, color:sel===g.id?C.blue:C.text2 }}>{g.label}</div>
-              {g.severity==='critical'&&<div style={{ fontSize:9, color:C.red, fontWeight:700, marginTop:2 }}>URGENT</div>}
+            <div key={cl.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                <div style={{width:44,height:44,borderRadius:'50%',background:`linear-gradient(135deg,${C.blue},${C.purple})`,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,flexShrink:0}}>
+                  {cl.name.split(' ').map(w=>w[0]).join('')}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{cl.name}</div>
+                  <div style={{fontSize:12,color:C.text3}}>{cl.area}</div>
+                </div>
+                <span style={{background:cl.active?C.greenL:C.grayL,color:cl.active?C.green:C.gray,padding:'2px 9px',borderRadius:99,fontSize:11,fontWeight:700}}>{cl.active?'Active':'Off Duty'}</span>
+              </div>
+              <div style={{display:'flex',gap:0,background:C.surface,borderRadius:10,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:10}}>
+                {[['Assigned',assigned.length],['Done',done.length],['Pending',assigned.length-done.length]].map(([l,v],i)=>(
+                  <div key={l} style={{flex:1,padding:'9px 6px',textAlign:'center',borderRight:i<2?`1px solid ${C.border}`:'none'}}>
+                    <div style={{fontSize:9.5,fontWeight:700,color:C.text3,textTransform:'uppercase',letterSpacing:.5,marginBottom:3}}>{l}</div>
+                    <div style={{fontWeight:800,fontSize:18}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              {/* tasks assigned to this cleaner */}
+              {assigned.slice(0,2).map(t=>(
+                <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderTop:`1px solid ${C.border}`}}>
+                  <div style={{width:32,height:32,borderRadius:6,overflow:'hidden',flexShrink:0,border:`1px solid ${C.border}`,background:C.surface}}>
+                    {t.photoURL?<img src={t.photoURL} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>📷</div>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11.5,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.area}</div>
+                    <div style={{fontSize:10.5,color:C.text3}}>{timeAgo(t.reportedAt)}</div>
+                  </div>
+                  <span style={{background:t.cleanerStatus==='DONE'?C.greenL:C.amberL,color:t.cleanerStatus==='DONE'?C.green:C.amber,padding:'2px 7px',borderRadius:99,fontSize:10,fontWeight:700}}>
+                    {t.cleanerStatus==='DONE'?'Cleaned':t.cleanerStatus==='CLEANING'?'Cleaning':'Assigned'}
+                  </span>
+                </div>
+              ))}
             </div>
           );
         })}
       </div>
-
-      <div style={{ padding:'0 14px 16px', flexShrink:0 }}>
-        <PrimaryBtn disabled={!sel} onClick={()=>onSelect(GARBAGE_TYPES.find(g=>g.id===sel))} icon={ChevronLeft} color={C.blue}>
-          Continue
-        </PrimaryBtn>
-      </div>
-    </div>
+    </>
   );
 }
 
-/* ═══ SCREEN 4: CONFIRM ═══ */
-function ConfirmScreen({ photoURL, gtype, gps, onSend, onBack }) {
-  const [station, setStation] = useState(STATIONS[0].name);
-  const [note,    setNote]    = useState('');
-  const [zoom,    setZoom]    = useState(false);
-  const Icon = GTYPE_ICONS[gtype.label] || Trash2;
-
+/* ─── TASK MAP TAB ─── */
+function TaskMapTab({ tasks, onSelect }) {
+  const withCoords = tasks.filter(c=>c.lat&&c.lng);
   return (
-    <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
-      <TopBar title="Confirm & Send" onBack={onBack}/>
-
-      <div style={{ flex:1, overflowY:'auto' }}>
-        {/* Full captured photo */}
-        <div style={{ position:'relative', background:'#000' }}>
-          <img src={photoURL} alt="garbage" style={{ width:'100%', maxHeight:220, objectFit:'cover', display:'block' }}/>
-          <button onClick={()=>setZoom(true)} style={{ position:'absolute', bottom:8, right:8, background:'rgba(0,0,0,.5)', border:'none', borderRadius:8, padding:'5px 9px', cursor:'pointer', display:'flex', alignItems:'center', gap:4, color:'#fff', fontSize:11, fontWeight:600 }}>
-            <ZoomIn size={13}/> View full
-          </button>
-          {/* type badge on photo */}
-          <div style={{ position:'absolute', top:8, left:8, background:'rgba(0,0,0,.65)', color:'#fff', padding:'5px 11px', borderRadius:99, fontSize:11.5, fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>
-            <Icon size={13}/> {gtype.label}
+    <>
+      <div className="page-hd"><div className="page-title">Task Map</div><div className="page-sub">Live Nagpur complaint locations</div></div>
+      <div style={{display:'flex',gap:7,flexWrap:'wrap',marginBottom:10}}>
+        {['NEW','ACCEPTED','IN_PROGRESS','COMPLETED'].map(s=>{
+          const dots={NEW:'🔴',ACCEPTED:'🔵',IN_PROGRESS:'🟣',COMPLETED:'🟢'};
+          const labels={NEW:'New',ACCEPTED:'Accepted',IN_PROGRESS:'In Progress',COMPLETED:'Done'};
+          return <span key={s} style={{fontSize:11.5,background:C.white,border:`1px solid ${C.border}`,padding:'3px 10px',borderRadius:99,display:'flex',gap:4,alignItems:'center'}}>{dots[s]} {labels[s]}</span>;
+        })}
+      </div>
+      <LiveMap complaints={withCoords} center={[21.1458,79.0882]} zoom={14} height="300px" onPinClick={onSelect}/>
+      <div style={{marginTop:14,display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12}}>
+        {withCoords.slice(0,4).map(c=>(
+          <div key={c.id} onClick={()=>onSelect(c)} style={{display:'flex',gap:10,background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px',cursor:'pointer',alignItems:'center'}}
+            onMouseEnter={e=>e.currentTarget.style.background=C.blueL} onMouseLeave={e=>e.currentTarget.style.background=C.white}>
+            <div style={{width:40,height:40,borderRadius:8,overflow:'hidden',flexShrink:0,background:C.surface,border:`1px solid ${C.border}`}}>
+              {c.photoURL?<img src={c.photoURL} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<MapPin size={16} color={C.text3} style={{margin:'12px auto',display:'block'}}/>}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,fontFamily:'monospace',color:C.text3}}>{c.id}</div>
+              <div style={{fontSize:13,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.area} — {c.gtype}</div>
+              <div style={{fontSize:11,color:C.text3,display:'flex',alignItems:'center',gap:4}}><Clock size={10}/>{timeAgo(c.reportedAt)}</div>
+            </div>
+            <Badge status={c.status}/>
           </div>
-        </div>
+        ))}
+      </div>
+    </>
+  );
+}
 
-        <div style={{ padding:'14px 16px' }}>
-          {/* GPS card */}
-          <div style={{ background:C.greenL, border:`1px solid #C8E6C9`, borderRadius:10, padding:'9px 12px', display:'flex', alignItems:'center', gap:9, marginBottom:12 }}>
-            <MapPin size={16} color={C.green}/>
+/* ─── STATS TAB ─── */
+function StatsTab({ tasks }) {
+  const rate = calcResolutionRate(tasks);
+  const avg  = avgResolutionTime(tasks);
+  const done = tasks.filter(c=>c.status==='COMPLETED').length;
+  return (
+    <>
+      <div className="page-hd"><div className="page-title">Statistics</div><div className="page-sub">Performance overview</div></div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:14}}>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>Completion Rate</div>
+          <div style={{display:'flex',alignItems:'center',gap:16}}>
+            <div style={{width:80,height:80,borderRadius:'50%',background:`conic-gradient(${C.green} 0% ${rate}%,#ECEFF1 ${rate}% 100%)`,position:'relative',flexShrink:0}}>
+              <div style={{position:'absolute',inset:10,borderRadius:'50%',background:C.white,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:16}}>{rate}%</div>
+            </div>
             <div>
-              <div style={{ fontSize:12, fontWeight:700, color:C.green }}>Location captured</div>
-              <div style={{ fontSize:11, color:C.green, fontFamily:'monospace' }}>{gps?.lat}°N, {gps?.lng}°E</div>
+              <div style={{fontSize:13,color:C.text3,marginBottom:5}}>Today</div>
+              <div><span style={{color:C.green,fontWeight:700}}>{done} done</span> / {tasks.length} total</div>
+              <div style={{fontSize:12,color:C.text3,marginTop:4}}>Avg: <strong>{avg} min</strong></div>
             </div>
           </div>
-
-          {/* mini map */}
-          <div style={{ borderRadius:10, overflow:'hidden', marginBottom:12, border:`1px solid ${C.border}` }}>
-            <LiveMap singlePin singleCoords={gps} height="130px" zoom={15}/>
-          </div>
-
-          {/* station */}
-          <div style={{ marginBottom:10 }}>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:.5, marginBottom:5 }}>
-              Nearest Station
-            </label>
-            <select value={station} onChange={e=>setStation(e.target.value)}
-              style={{ width:'100%', padding:'10px 12px', border:`1px solid ${C.border}`, borderRadius:9, fontSize:13, fontFamily:'inherit', background:C.white }}>
-              {STATIONS.map(s=><option key={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-
-          {/* note */}
-          <div style={{ marginBottom:10 }}>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:.5, marginBottom:5 }}>
-              Note <span style={{ textTransform:'none', fontWeight:400 }}>(optional)</span>
-            </label>
-            <textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={200} placeholder="e.g. Near platform 3, left side…"
-              style={{ width:'100%', padding:'9px 12px', border:`1px solid ${C.border}`, borderRadius:9, fontSize:13, minHeight:60, resize:'none', fontFamily:'inherit' }}/>
-          </div>
-
-          {gtype.severity==='critical'&&(
-            <div style={{ background:C.redL, border:`1px solid #FFCDD2`, borderRadius:8, padding:'9px 12px', fontSize:12, color:C.red, fontWeight:600, display:'flex', gap:8, alignItems:'flex-start', marginBottom:10 }}>
-              <AlertTriangle size={15} style={{ flexShrink:0, marginTop:1 }}/> Critical issue — will be escalated to admin immediately.
+          <ProgressBar value={rate} color={C.green} height={6}/>
+        </div>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Breakdown</div>
+          {['NEW','ACCEPTED','IN_PROGRESS','COMPLETED','QUERIED'].map(s=>(
+            <div key={s} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
+              <Badge status={s}/><span style={{fontWeight:700,fontSize:14}}>{tasks.filter(c=>c.status===s).length}</span>
             </div>
-          )}
+          ))}
         </div>
       </div>
-
-      <div style={{ padding:'12px 14px 16px', borderTop:`1px solid ${C.border}`, display:'flex', gap:10, flexShrink:0, background:C.white }}>
-        <button onClick={onBack} style={{ background:C.surface, color:C.text2, padding:'12px 14px', borderRadius:11, fontSize:13, fontWeight:600, border:`1px solid ${C.border}`, cursor:'pointer' }}>Back</button>
-        <PrimaryBtn onClick={()=>onSend({gtype,station,note,lat:gps?.lat,lng:gps?.lng,photoURL})} icon={Send} style={{ flex:1 }}>Send Report</PrimaryBtn>
-      </div>
-
-      {/* Zoom modal */}
-      {zoom && (
-        <div onClick={()=>setZoom(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.92)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <img src={photoURL} alt="fullscreen" style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain', borderRadius:8 }}/>
-          <button onClick={()=>setZoom(false)} style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,.15)', border:'none', borderRadius:'50%', width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-            <X size={18} color="#fff"/>
-          </button>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
-/* ═══ SCREEN 5: SUCCESS ═══ */
-function SuccessScreen({ ticket, photoURL, gps, gtype, onDone }) {
-  const Icon = GTYPE_ICONS[gtype?.label] || Trash2;
-  return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {/* photo hero */}
-      <div style={{ position:'relative', flexShrink:0 }}>
-        <img src={photoURL} alt="reported" style={{ width:'100%', height:180, objectFit:'cover', display:'block', filter:'brightness(.7)' }}/>
-        <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6 }}>
-          <CheckCircle2 size={52} color="#4CAF50" strokeWidth={1.5}/>
-          <div style={{ color:'#fff', fontSize:20, fontWeight:800 }}>Report Sent!</div>
-        </div>
-      </div>
+/* ─── MAIN VENDOR PORTAL ─── */
+export default function VendorPortal() {
+  const { complaints, updateComplaint } = useApp();
+  const [tab,           setTab]           = useState('tasks');
+  const [selected,      setSelected]      = useState(null);
+  const [assigning,     setAssigning]     = useState(null); // complaint being assigned
+  const [notif,         setNotif]         = useState(null);
+  const [liveToast,     setLiveToast]     = useState(null);
 
-      <div style={{ flex:1, overflowY:'auto', padding:'18px 18px 0' }}>
-        {/* ticket */}
-        <div style={{ background:C.navy, color:'#fff', borderRadius:14, padding:'14px 20px', marginBottom:14 }}>
-          <div style={{ fontSize:10, opacity:.55, fontWeight:700, letterSpacing:.5, textTransform:'uppercase', marginBottom:3 }}>Ticket Number</div>
-          <div style={{ fontSize:22, fontWeight:800, fontFamily:'monospace', letterSpacing:2 }}>{ticket}</div>
-          <div style={{ fontSize:11, opacity:.5, marginTop:4 }}>Screenshot this to track your complaint</div>
-        </div>
+  const myTasks = complaints.filter(c => c.vendor?.id === 'v1');
 
-        {/* details */}
-        <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:'12px 14px', marginBottom:12 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 0', borderBottom:`1px solid ${C.border}` }}>
-            <Icon size={15} color={C.text3}/><span style={{ fontSize:13, color:C.text2 }}>Type</span>
-            <span style={{ marginLeft:'auto', fontWeight:600, fontSize:13 }}>{gtype?.label}</span>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 0', borderBottom:`1px solid ${C.border}` }}>
-            <MapPin size={15} color={C.text3}/><span style={{ fontSize:13, color:C.text2 }}>Location</span>
-            <span style={{ marginLeft:'auto', fontWeight:600, fontSize:11, fontFamily:'monospace' }}>{gps?.lat}°N</span>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 0' }}>
-            <Clock size={15} color={C.text3}/><span style={{ fontSize:13, color:C.text2 }}>Reported</span>
-            <span style={{ marginLeft:'auto', fontWeight:600, fontSize:13 }}>Just now</span>
-          </div>
-        </div>
+  // Listen for new complaints from user
+  useEffect(() => {
+    const unsub = bus.on('NEW_COMPLAINT', (c) => {
+      if (c.vendor?.id !== 'v1') return;
+      setLiveToast(`🔔 New complaint: ${c.id} — ${c.area}`);
+      setTimeout(() => setLiveToast(null), 5000);
+    });
+    return unsub;
+  }, []);
 
-        {/* map showing where report was */}
-        <div style={{ borderRadius:12, overflow:'hidden', marginBottom:12, border:`1px solid ${C.border}` }}>
-          <LiveMap singlePin singleCoords={gps} height="140px" zoom={15}/>
-        </div>
-
-        <div style={{ background:C.greenL, border:`1px solid #C8E6C9`, borderRadius:12, padding:'11px 14px', marginBottom:18, fontSize:13, color:C.green, fontWeight:500, display:'flex', gap:8, alignItems:'flex-start' }}>
-          <CheckCircle2 size={16} style={{ flexShrink:0, marginTop:1 }}/> You will be notified when the vendor accepts and when cleaning is complete.
-        </div>
-      </div>
-
-      <div style={{ padding:'12px 18px 20px', borderTop:`1px solid ${C.border}`, flexShrink:0, background:C.white }}>
-        <PrimaryBtn onClick={onDone} icon={MapPin}>Back to Map</PrimaryBtn>
-      </div>
-    </div>
-  );
-}
-
-/* ═══ MAIN USER PORTAL ═══ */
-export default function UserPortal() {
-  const { addComplaint } = useApp();
-  const [screen,     setScreen]     = useState('map');
-  const [photoURL,   setPhotoURL]   = useState(null);
-  const [gps,        setGps]        = useState(null);
-  const [gtype,      setGtype]      = useState(null);
-  const [ticket,     setTicket]     = useState(null);
-  const [myReports,  setMyReports]  = useState([]);
-
-  const handleCapture = (dataURL, coords) => { setPhotoURL(dataURL); setGps(coords); setScreen('picker'); };
-  const handleSelect  = (g) => { setGtype(g); setScreen('confirm'); };
-  const handleSend    = (data) => {
-    const id = addComplaint({ ...data, gtype:data.gtype.label, emoji:'📷', severity:data.gtype.severity });
-    setTicket(id);
-    setMyReports(p => [{
-      id, gtype:data.gtype.label, area:data.station, photoURL:data.photoURL,
-      station:{ name:data.station }, status:'NEW', reportedAt:new Date(),
-      lat:parseFloat(data.lat), lng:parseFloat(data.lng),
-    }, ...p]);
-    setScreen('success');
+  const act = (id, status) => {
+    updateComplaint(id, { status });
+    if (selected?.id === id) setSelected(s => ({...s, status}));
+    const msgs = { ACCEPTED:'Task accepted', IN_PROGRESS:'Task started', COMPLETED:'Task completed!', QUERIED:'Query raised' };
+    setNotif(msgs[status] || 'Updated');
   };
 
+  const handleAssignCleaner = (complaintId, cleaner) => {
+    updateComplaint(complaintId, {
+      assignedTo:    cleaner.name,
+      cleanerStatus: 'ASSIGNED',
+      status:        'ACCEPTED',
+    });
+    setAssigning(null);
+    setNotif(`Assigned to ${cleaner.name}`);
+  };
+
+  const navItems = [
+    { key:'tasks',    icon:'📋', label:'Tasks',    count: myTasks.filter(c=>c.status==='NEW').length },
+    { key:'cleaners', icon:'👷', label:'Cleaners'  },
+    { key:'map',      icon:'🗺️', label:'Task Map'  },
+    { key:'stats',    icon:'📊', label:'Stats'     },
+  ];
+
   return (
-    <div style={{ width:'100%', maxWidth:430, margin:'0 auto', background:C.white, display:'flex', flexDirection:'column', height:'100vh', fontFamily:'DM Sans,system-ui,sans-serif', overflow:'hidden' }}>
-      {/* status bar */}
-      <div style={{ background:'#000', padding:'7px 18px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
-        <span style={{ color:'#fff', fontSize:12, fontWeight:600 }}>9:41</span>
-        <div style={{ color:'rgba(255,255,255,.7)', fontSize:11, display:'flex', gap:5 }}><span>●●●</span><span>WiFi</span><span>🔋</span></div>
+    <div style={{display:'flex',height:'100vh',fontFamily:'DM Sans,system-ui,sans-serif',overflow:'hidden'}}>
+      <Sidebar title="Nagpur CleanRail" subtitle="Vendor Portal" navItems={navItems} activeTab={tab} onTabChange={setTab}
+        footerUser={{initials:'RP',name:'Ramesh Patil',role:'Vendor Manager',avatarColor:C.blue}}/>
+
+      <div style={{flex:1,overflowY:'auto',background:C.surface,display:'flex',flexDirection:'column'}}>
+        {/* live toast banner */}
+        {liveToast&&(
+          <div style={{background:C.navy,color:'#fff',padding:'10px 18px',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:8,borderBottom:`1px solid rgba(255,255,255,.1)`,flexShrink:0}}>
+            <Bell size={15} color="#42A5F5"/>{liveToast}
+            <button onClick={()=>setLiveToast(null)} style={{marginLeft:'auto',background:'none',border:'none',color:'rgba(255,255,255,.5)',cursor:'pointer',fontSize:16}}>✕</button>
+          </div>
+        )}
+        {notif && <NotifBanner msg={notif} type="green" onDone={()=>setNotif(null)}/>}
+        <div style={{padding:22,maxWidth:900,margin:'0 auto',width:'100%'}}>
+          {tab==='tasks'    && <TaskInbox tasks={myTasks} onAction={act} onSelect={setSelected} onAssignCleaner={c=>setAssigning(c)}/>}
+          {tab==='cleaners' && <CleanersTab tasks={myTasks}/>}
+          {tab==='map'      && <TaskMapTab  tasks={myTasks} onSelect={setSelected}/>}
+          {tab==='stats'    && <StatsTab    tasks={myTasks}/>}
+        </div>
       </div>
 
-      {screen==='map'     && <MapHome     onReport={()=>setScreen('camera')} myReports={myReports}/>}
-      {screen==='camera'  && <CameraScreen onCapture={handleCapture} onBack={()=>setScreen('map')}/>}
-      {screen==='picker'  && <PickerScreen photoURL={photoURL} onSelect={handleSelect} onBack={()=>setScreen('camera')}/>}
-      {screen==='confirm' && gtype && <ConfirmScreen photoURL={photoURL} gtype={gtype} gps={gps} onSend={handleSend} onBack={()=>setScreen('picker')}/>}
-      {screen==='success' && ticket && <SuccessScreen ticket={ticket} photoURL={photoURL} gps={gps} gtype={gtype} onDone={()=>setScreen('map')}/>}
+      {selected   && <VendorComplaintModal complaint={selected} onClose={()=>setSelected(null)} onAction={(id,s)=>{act(id,s);setSelected(null);}}/>}
+      {assigning  && <AssignCleanerModal complaint={assigning} onClose={()=>setAssigning(null)} onAssign={handleAssignCleaner}/>}
+
+      <style>{`
+        .page-hd{margin-bottom:18px}.page-title{font-size:18px;font-weight:800;color:#0D1117;margin-bottom:2px}.page-sub{font-size:12px;color:#7A8FA6}
+        @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+        @media(max-width:639px){.sidebar{display:none}}
+      `}</style>
     </div>
   );
 }
+// VENDOREOF
+// echo "Done"

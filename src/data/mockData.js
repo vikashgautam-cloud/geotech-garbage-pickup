@@ -62,3 +62,14 @@ export function generateComplaints(count = 22) {
     };
   });
 }
+// cat >> /home/claude/grwms/src/data/mockData.js << 'EOF'
+
+// ─── CLEANERS (assigned under vendors) ────────────────────────────────────
+export const CLEANERS = [
+  { id: 'c1', name: 'Dinesh Rao',    phone: '94501-11223', vendorId: 'v1', area: 'Platform 1–3',   active: true  },
+  { id: 'c2', name: 'Anjali Meshram',phone: '94502-22334', vendorId: 'v1', area: 'Waiting Hall',   active: true  },
+  { id: 'c3', name: 'Santosh Nagre', phone: '94503-33445', vendorId: 'v2', area: 'Platform 4–5',   active: true  },
+  { id: 'c4', name: 'Rekha Borde',   phone: '94504-44556', vendorId: 'v2', area: 'Food Court Area', active: false },
+  { id: 'c5', name: 'Vikram Kamble', phone: '94505-55667', vendorId: 'v3', area: 'Wardha Zone',    active: true  },
+];
+// EOF

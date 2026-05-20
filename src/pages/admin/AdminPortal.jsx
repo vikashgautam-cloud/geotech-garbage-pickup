@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, List, Map, Building2, BarChart2, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { useApp } from '../../App';
+import { useApp, bus } from '../../App';
 import { Sidebar } from '../../components/Sidebar';
 import { Badge } from '../../components/ComplaintCard';
 import { ComplaintCard, AdminComplaintModal } from '../../components/ComplaintCard';
@@ -229,11 +229,141 @@ function ReportsPage({ complaints }) {
 }
 
 /* ── MAIN ADMIN PORTAL ── */
+/* ── LIVE FEED TAB ── */
+function LiveFeedTab({ feed, complaints, onSelect }) {
+  const recent = complaints.slice(0, 6);
+  return (
+    <>
+      <div className="page-hd">
+        <div className="page-title">⚡ Live Activity Feed</div>
+        <div className="page-sub">Real-time workflow — user → vendor → cleaner → done</div>
+      </div>
+
+      {/* workflow legend */}
+      <div style={{background:'#fff',border:'1px solid #DDE3E9',borderRadius:14,padding:'14px 18px',marginBottom:16}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Workflow: How a complaint flows</div>
+        <div style={{display:'flex',alignItems:'center',gap:0,flexWrap:'wrap'}}>
+          {[
+            {step:'1',label:'User reports',sub:'Photos + GPS',color:'#E65100',bg:'#FFF3E0'},
+            {step:'→',label:'',sub:'',color:'#ccc',bg:'transparent'},
+            {step:'2',label:'Vendor sees it',sub:'Accepts task',color:'#1565C0',bg:'#E3F2FD'},
+            {step:'→',label:'',sub:'',color:'#ccc',bg:'transparent'},
+            {step:'3',label:'Cleaner assigned',sub:'Goes to spot',color:'#4527A0',bg:'#EDE7F6'},
+            {step:'→',label:'',sub:'',color:'#ccc',bg:'transparent'},
+            {step:'4',label:'Cleaner cleans',sub:'Takes after photo',color:'#2E7D32',bg:'#E8F5E9'},
+            {step:'→',label:'',sub:'',color:'#ccc',bg:'transparent'},
+            {step:'✓',label:'Admin confirms',sub:'Auto-completed',color:'#2E7D32',bg:'#E8F5E9'},
+          ].map((s,i)=>(
+            s.label
+              ? <div key={i} style={{textAlign:'center',padding:'6px 10px',background:s.bg,borderRadius:9,margin:'2px'}}>
+                  <div style={{fontSize:16,fontWeight:800,color:s.color}}>{s.step}</div>
+                  <div style={{fontSize:10.5,fontWeight:700,color:s.color}}>{s.label}</div>
+                  <div style={{fontSize:9.5,color:'#7A8FA6'}}>{s.sub}</div>
+                </div>
+              : <div key={i} style={{color:'#ccc',fontSize:20,margin:'0 2px'}}>→</div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16}}>
+        {/* Live event log */}
+        <div style={{background:'#fff',border:'1px solid #DDE3E9',borderRadius:14,overflow:'hidden'}}>
+          <div style={{padding:'12px 16px',borderBottom:'1px solid #DDE3E9',fontWeight:700,fontSize:13,display:'flex',alignItems:'center',gap:8}}>
+            <span style={{width:8,height:8,borderRadius:'50%',background:'#4CAF50',display:'inline-block',animation:'pulse-live 1.5s infinite'}}/>
+            Live Events
+            <span style={{marginLeft:'auto',fontSize:11,color:'#7A8FA6'}}>{feed.length} events</span>
+          </div>
+          <div style={{maxHeight:380,overflowY:'auto',padding:'0 16px'}}>
+            {feed.length===0&&<div style={{padding:'24px 0',textAlign:'center',color:'#7A8FA6',fontSize:13}}>Events will appear here as users submit complaints and vendors process them.</div>}
+            {feed.map(ev=><LiveFeedItem key={ev.id} event={ev}/>)}
+          </div>
+        </div>
+
+        {/* Recent complaints with before/after */}
+        <div style={{background:'#fff',border:'1px solid #DDE3E9',borderRadius:14,overflow:'hidden'}}>
+          <div style={{padding:'12px 16px',borderBottom:'1px solid #DDE3E9',fontWeight:700,fontSize:13}}>Recent Complaints</div>
+          <div style={{maxHeight:380,overflowY:'auto'}}>
+            {recent.map(c=>(
+              <div key={c.id} onClick={()=>onSelect(c)} style={{padding:'10px 14px',borderBottom:'1px solid #DDE3E9',cursor:'pointer',transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='#F7F9FC'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
+                  <div style={{width:40,height:40,borderRadius:8,overflow:'hidden',flexShrink:0,border:'1px solid #DDE3E9',background:'#111'}}>
+                    {c.photoURL?<img src={c.photoURL} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>📷</div>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11,fontFamily:'monospace',color:'#7A8FA6'}}>{c.id}</div>
+                    <div style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.area}</div>
+                  </div>
+                  <Badge status={c.status}/>
+                </div>
+                {/* show cleaned photo if available */}
+                {c.cleanedPhotoURL&&(
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginTop:4}}>
+                    <div style={{borderRadius:6,overflow:'hidden',height:50,position:'relative'}}>
+                      {c.photoURL&&<img src={c.photoURL} alt="before" style={{width:'100%',height:'100%',objectFit:'cover',filter:'brightness(.7)'}}/>}
+                      <div style={{position:'absolute',bottom:2,left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,.7)',color:'#fff',fontSize:8,fontWeight:700,padding:'1px 5px',borderRadius:4,whiteSpace:'nowrap'}}>BEFORE</div>
+                    </div>
+                    <div style={{borderRadius:6,overflow:'hidden',height:50,position:'relative',border:'1.5px solid #2E7D32'}}>
+                      <img src={c.cleanedPhotoURL} alt="after" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      <div style={{position:'absolute',bottom:2,left:'50%',transform:'translateX(-50%)',background:'rgba(46,125,50,.9)',color:'#fff',fontSize:8,fontWeight:700,padding:'1px 5px',borderRadius:4,whiteSpace:'nowrap'}}>AFTER ✓</div>
+                    </div>
+                  </div>
+                )}
+                {c.assignedTo&&(
+                  <div style={{fontSize:11,color:'#4527A0',marginTop:4,display:'flex',alignItems:'center',gap:4}}>
+                    👷 Cleaner: {c.assignedTo} · {c.cleanerStatus==='DONE'?'✅ Cleaned':c.cleanerStatus==='CLEANING'?'🧹 Cleaning':'Assigned'}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes pulse-live{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}`}</style>
+    </>
+  );
+}
+
+// LiveFeedItem already defined above
+
+function LiveFeedItem({ event }) {
+  const icons = { NEW:'🔴', ACCEPTED:'🔵', IN_PROGRESS:'🟣', COMPLETED:'🟢', CLEANER_DONE:'✅' };
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 0',borderBottom:'1px solid #DDE3E9'}}>
+      <span style={{fontSize:18,flexShrink:0}}>{icons[event.type]||'⚪'}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:12.5,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{event.msg}</div>
+        <div style={{fontSize:11,color:'#7A8FA6'}}>{event.time}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPortal() {
   const { complaints, updateComplaint } = useApp();
-  const [tab,      setTab]     = useState('dashboard');
-  const [selected, setSelected] = useState(null);
-  const [notif,    setNotif]   = useState(null);
+  const [tab,        setTab]       = useState('dashboard');
+  const [selected,   setSelected]  = useState(null);
+  const [notif,      setNotif]     = useState(null);
+  const [liveToast,  setLiveToast] = useState(null);
+  const [activityFeed, setActivityFeed] = useState([]);
+
+  // Listen for ALL complaint events and push to activity feed
+  useEffect(() => {
+    const addEvent = (type, msg) => {
+      const ev = { id: Date.now(), type, msg, time: new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) };
+      setActivityFeed(p => [ev, ...p.slice(0,49)]);
+      setLiveToast(msg);
+      setTimeout(() => setLiveToast(null), 5000);
+    };
+    const u1 = bus.on('NEW_COMPLAINT',    c => addEvent('NEW',          `New complaint ${c.id} — ${c.area} (${c.station?.name?.split(' ')[0]})`));
+    const u2 = bus.on('COMPLAINT_UPDATED', c => {
+      if (c.status==='ACCEPTED')    addEvent('ACCEPTED',    `${c.id} accepted by ${c.vendor?.name}`);
+      if (c.status==='IN_PROGRESS') addEvent('IN_PROGRESS', `${c.id} — cleaning in progress`);
+      if (c.cleanerStatus==='DONE') addEvent('CLEANER_DONE',`${c.id} cleaned by ${c.assignedTo} ✓`);
+      if (c.status==='COMPLETED')   addEvent('COMPLETED',   `${c.id} marked COMPLETED`);
+    });
+    return () => { u1(); u2(); };
+  }, []);
 
   const onStatusChange = (id, status) => {
     updateComplaint(id, { status });
@@ -248,6 +378,7 @@ export default function AdminPortal() {
 
   const navItems = [
     { key:'dashboard',  icon:'🏠', label:'Dashboard'  },
+    { key:'live',       icon:'⚡', label:'Live Feed',   count: activityFeed.filter(e=>e.type==='NEW').length > 0 ? activityFeed.filter(e=>e.type==='NEW').length : 0 },
     { key:'complaints', icon:'📋', label:'Complaints',  count: complaints.filter(c=>c.status==='NEW'||c.status==='ESCALATED').length },
     { key:'map',        icon:'🗺️', label:'Live Map'   },
     { key:'vendors',    icon:'🏢', label:'Vendors'     },
@@ -256,12 +387,20 @@ export default function AdminPortal() {
 
   return (
     <div style={{display:'flex',height:'100vh',fontFamily:'DM Sans,system-ui,sans-serif',overflow:'hidden'}}>
-      <Sidebar title="Admin Control Center" subtitle="Railway Board · Sanitation" navItems={navItems} activeTab={tab} onTabChange={setTab}
+      <Sidebar title="Admin Control Center" subtitle="Railway Board · Nagpur" navItems={navItems} activeTab={tab} onTabChange={setTab}
         footerUser={{initials:'AD',name:'Admin Officer',role:'Railway Board',avatarColor:'#B71C1C'}}/>
-      <div style={{flex:1,overflowY:'auto',background:'#F7F9FC'}}>
+      <div style={{flex:1,overflowY:'auto',background:'#F7F9FC',display:'flex',flexDirection:'column'}}>
+        {/* live toast */}
+        {liveToast&&(
+          <div style={{background:'#0A1628',color:'#fff',padding:'10px 18px',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:8,flexShrink:0,animation:'slideDown .3s ease'}}>
+            <span style={{fontSize:16}}>⚡</span>{liveToast}
+            <button onClick={()=>setLiveToast(null)} style={{marginLeft:'auto',background:'none',border:'none',color:'rgba(255,255,255,.5)',cursor:'pointer',fontSize:16}}>✕</button>
+          </div>
+        )}
         {notif && <NotifBanner msg={notif} type="amber" onDone={()=>setNotif(null)}/>}
-        <div style={{padding:22,maxWidth:900,margin:'0 auto'}}>
+        <div style={{padding:22,maxWidth:900,margin:'0 auto',width:'100%'}}>
           {tab==='dashboard'  && <Dashboard    complaints={complaints} onSelect={setSelected} onTabChange={setTab}/>}
+          {tab==='live'       && <LiveFeedTab  feed={activityFeed} complaints={complaints} onSelect={setSelected}/>}
           {tab==='complaints' && <ComplaintsList complaints={complaints} onSelect={setSelected}/>}
           {tab==='map'        && <LiveMapTab    complaints={complaints} onSelect={setSelected}/>}
           {tab==='vendors'    && <VendorsPage   complaints={complaints}/>}
