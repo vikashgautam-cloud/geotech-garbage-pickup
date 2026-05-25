@@ -1,58 +1,38 @@
 import React from 'react';
 
-export function Sidebar({ title, subtitle, navItems, activeTab, onTabChange, footerUser }) {
+export function Sidebar({ title, subtitle, navItems = [], activeTab, onTabChange, footerUser }) {
   return (
-    <div style={{
-      width: 220, background: '#112240', display: 'flex', flexDirection: 'column',
-      borderRight: '1px solid rgba(255,255,255,.07)', flexShrink: 0, height: '100%',
-    }}>
-      <div style={{ padding: '18px 16px 12px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
-        <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{title}</div>
-        <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 11 }}>{subtitle}</div>
+    <div style={{ width: 240, background: '#0A1628', color: '#fff', display: 'flex', flexDirection: 'column', padding: '20px 0' }}>
+      <div style={{ padding: '0 20px', marginBottom: 24 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>{title}</h3>
+        <p style={{ margin: '2px 0 0 0', fontSize: 11, color: '#7A8FA6' }}>{subtitle}</p>
       </div>
 
-      <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
-        {navItems.map(n => (
-          <button key={n.key}
-            onClick={() => onTabChange(n.key)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 9,
-              color: activeTab === n.key ? '#fff' : 'rgba(255,255,255,.5)',
-              background: activeTab === n.key ? 'rgba(255,255,255,.1)' : 'none',
-              fontSize: 13, fontWeight: 500, cursor: 'pointer',
-              border: 'none', width: '100%', textAlign: 'left',
-              marginBottom: 2, transition: 'all .15s',
-            }}
-            onMouseEnter={e => { if (activeTab !== n.key) e.currentTarget.style.background = 'rgba(255,255,255,.05)'; }}
-            onMouseLeave={e => { if (activeTab !== n.key) e.currentTarget.style.background = 'none'; }}
-          >
-            <span style={{ fontSize: 16, width: 20, textAlign: 'center', flexShrink: 0 }}>{n.icon}</span>
-            {n.label}
-            {n.count > 0 && (
-              <span style={{
-                marginLeft: 'auto', background: '#B71C1C', color: '#fff',
-                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
-              }}>{n.count}</span>
-            )}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px' }}>
+        {navItems.map(item => (
+          <button key={item.key} onClick={() => onTabChange(item.key)} style={{
+            display: 'flex', alignItems: 'center', width: '100%', padding: '10px 12px', border: 'none',
+            borderRadius: 8, background: activeTab === item.key ? '#1565C0' : 'transparent',
+            color: activeTab === item.key ? '#fff' : '#A0AEC0', textAlign: 'left', cursor: 'pointer', fontSize: 13, fontWeight: 600
+          }}>
+            <span style={{ marginRight: 8 }}>{item.icon}</span>
+            <span style={{ flex: 1 }}>{item.label}</span>
+            {item.count > 0 && <span style={{ fontSize: 10, background: '#FF1744', color: '#fff', padding: '1px 6px', borderRadius: 10 }}>{item.count}</span>}
           </button>
         ))}
-      </nav>
+      </div>
 
-      <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: footerUser.avatarColor || '#1565C0',
-            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 700, flexShrink: 0,
-          }}>{footerUser.initials}</div>
+      {footerUser && (
+        <div style={{ padding: '16px 20px', borderTop: '1px solid #1A2638', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: footerUser.avatarColor || '#1565C0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12 }}>
+            {footerUser.initials}
+          </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.8)' }}>{footerUser.name}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{footerUser.role}</div>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>{footerUser.name}</div>
+            <div style={{ fontSize: 10, color: '#7A8FA6' }}>{footerUser.role}</div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

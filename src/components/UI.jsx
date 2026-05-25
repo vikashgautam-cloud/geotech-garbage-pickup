@@ -1,13 +1,13 @@
+// src/components/UI.jsx
 import React from 'react';
 import { AlertTriangle, CheckCircle2, XCircle, MessageSquare, Navigation2, Clock } from 'lucide-react';
-import { STATUS_META } from '../data/mockData';
 
 const C = {
-  navy:'#0A1628',blue:'#1565C0',blue2:'#1976D2',blueL:'#E3F2FD',
-  green:'#2E7D32',greenL:'#E8F5E9',red:'#B71C1C',redL:'#FFEBEE',
-  amber:'#E65100',amberL:'#FFF3E0',purple:'#4527A0',purpleL:'#EDE7F6',
-  gray:'#546E7A',grayL:'#ECEFF1',text:'#0D1117',text2:'#3D4F61',text3:'#7A8FA6',
-  white:'#fff',surface:'#F7F9FC',border:'#DDE3E9',
+  navy:'#0A1628', blue:'#1565C0', blue2:'#1976D2', blueL:'#E3F2FD',
+  green:'#2E7D32', greenL:'#E8F5E9', red:'#B71C1C', redL:'#FFEBEE',
+  amber:'#E65100', amberL:'#FFF3E0', purple:'#4527A0', purpleL:'#EDE7F6',
+  gray:'#546E7A', grayL:'#ECEFF1', text:'#0D1117', text2:'#3D4F61', text3:'#7A8FA6',
+  white:'#fff', surface:'#F7F9FC', border:'#DDE3E9',
 };
 
 export function KPI({ label, value, sub, color }) {
@@ -101,7 +101,7 @@ export function NotifBanner({ msg, type='green', onDone }) {
   React.useEffect(()=>{ const t=setTimeout(onDone,3200); return()=>clearTimeout(t); },[onDone]);
   const bg={green:C.green,amber:C.amber,red:C.red}[type];
   return (
-    <div style={{ background:bg, color:'#fff', padding:'10px 18px', fontSize:13, fontWeight:600, display:'flex', alignItems:'center', gap:8, animation:'slideDown .3s ease', flexShrink:0 }}>
+    <div style={{ background:bg, color:'#fff', padding:'10px 18px', fontSize:13, fontWeight:600, display:'flex', alignItems:'center', gap:8, animation:'slideDown .3s ease', flexShrink:0, position:'fixed', top:0, left:0, right:0, zIndex:99999 }}>
       <CheckCircle2 size={16}/> {msg}
     </div>
   );

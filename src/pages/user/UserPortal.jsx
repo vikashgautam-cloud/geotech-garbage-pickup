@@ -1,314 +1,635 @@
-// cat > /home/claude/grwms/src/pages/vendor/VendorPortal.jsx << 'VENDOREOF'
-import React, { useState, useEffect } from 'react';
-import { useApp, bus } from '../../App';
-import { Sidebar } from '../../components/Sidebar';
-import { ComplaintCard, VendorComplaintModal } from '../../components/ComplaintCard';
-import { KPI, ProgressBar, NotifBanner } from '../../components/UI';
-import { Badge } from '../../components/ComplaintCard';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useApp } from '../../App';
+import { STATIONS, GARBAGE_TYPES, AREAS } from '../../data/mockData';
 import LiveMap from '../../components/LiveMap';
-import { CLEANERS } from '../../data/mockData';
-import { timeAgo, calcResolutionRate, avgResolutionTime } from '../../utils/helpers';
 import {
-  CheckCircle2, Navigation2, BarChart2, ListChecks, MapPin,
-  UserCheck, Bell, Clock, AlertTriangle, Users
+  Camera, MapPin, Send, ChevronLeft, CheckCircle2, AlertTriangle,
+  Trash2, Recycle, Package, FlaskConical, Droplets, Clock,
+  Navigation, Image, X, RotateCcw, ZoomIn, Bell, Shield
 } from 'lucide-react';
 
 const C = {
-  navy:'#0A1628',blue:'#1565C0',blueL:'#E3F2FD',green:'#2E7D32',greenL:'#E8F5E9',
-  red:'#B71C1C',redL:'#FFEBEE',amber:'#E65100',amberL:'#FFF3E0',purple:'#4527A0',
-  gray:'#546E7A',grayL:'#ECEFF1',text:'#0D1117',text2:'#3D4F61',text3:'#7A8FA6',
-  white:'#fff',surface:'#F7F9FC',border:'#DDE3E9',
+  navy: '#0A1628', blue: '#1565C0', blue2: '#1976D2', blueL: '#E3F2FD',
+  green: '#2E7D32', greenL: '#E8F5E9', red: '#B71C1C', redL: '#FFEBEE',
+  amber: '#E65100', amberL: '#FFF3E0', gray: '#546E7A', grayL: '#ECEFF1',
+  text: '#0D1117', text2: '#3D4F61', text3: '#7A8FA6',
+  white: '#fff', surface: '#F7F9FC', border: '#DDE3E9',
 };
 
-const Btn = ({ children, onClick, color=C.blue, outline=false, sm=false, Icon, disabled=false }) => (
-  <button onClick={onClick} disabled={disabled} style={{
-    padding:sm?'6px 11px':'8px 15px', borderRadius:9, fontSize:sm?11.5:13, fontWeight:600, cursor:disabled?'not-allowed':'pointer',
-    background:disabled?C.grayL:outline?C.white:color, color:disabled?C.gray:outline?color:C.white,
-    border:outline?`1px solid ${color}`:'none', transition:'all .15s',
-    display:'inline-flex', alignItems:'center', gap:5, opacity:disabled?.6:1,
-  }}>
-    {Icon && <Icon size={sm?12:14}/>} {children}
-  </button>
+const GTYPE_ICONS = {
+  'Plastic Waste': Trash2, 'Food Waste': Package, 'Abandoned Item': Package,
+  'Chemical Spill': FlaskConical, 'Recyclable Waste': Recycle, 'Sewage / Water': Droplets,
+};
+
+const StatusBadge = ({ status }) => {
+  const map = {
+    NEW: { bg: C.amberL, c: C.amber, l: 'Pending' },
+    ACCEPTED: { bg: C.blueL, c: C.blue, l: 'Accepted' },
+    IN_PROGRESS: { bg: '#EDE7F6', c: '#4527A0', l: 'In Progress' },
+    COMPLETED: { bg: C.greenL, c: C.green, l: 'Done' },
+    QUERIED: { bg: '#FFF8E1', c: '#F57F17', l: 'Queried' },
+    ESCALATED: { bg: C.redL, c: C.red, l: 'Escalated' }
+  };
+  const m = map[status] || map.NEW;
+  return <span style={{ background: m.bg, color: m.c, padding: '3px 9px', borderRadius: 99, fontSize: 10.5, fontWeight: 700 }}>{m.l}</span>;
+};
+
+const TopBar = ({ title, onBack, right }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: `1px solid ${C.border}`, background: C.white, flexShrink: 0 }}>
+    {onBack && <button onClick={onBack} style={{ width: 34, height: 34, borderRadius: '50%', background: C.surface, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><ChevronLeft size={18} color={C.text2}/></button>}
+    <span style={{ fontSize: 15, fontWeight: 700, flex: 1, color: C.text }}>{title}</span>
+    {right}
+  </div>
 );
 
-/* ─── ASSIGN CLEANER MODAL ─── */
-function AssignCleanerModal({ complaint, onClose, onAssign }) {
-  const myCleaners = CLEANERS.filter(c => c.vendorId === 'v1' && c.active);
+function LiveToast({ msg, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 4000); return () => clearTimeout(t); }, [onDone]);
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:400,padding:0}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.white,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:480,padding:'0 0 24px',boxShadow:'0 -4px 30px rgba(0,0,0,.15)'}}>
-        <div style={{width:36,height:4,background:C.border,borderRadius:99,margin:'10px auto 0'}}/>
-        <div style={{padding:'14px 20px 12px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div>
-            <div style={{fontSize:15,fontWeight:800}}>Assign Cleaner</div>
-            <div style={{fontSize:12,color:C.text3}}>Task: {complaint.id} — {complaint.area}</div>
-          </div>
-          <button onClick={onClose} style={{background:C.surface,border:'none',borderRadius:'50%',width:28,height:28,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>✕</button>
-        </div>
+    <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', background: C.navy, color: '#fff', padding: '10px 18px', borderRadius: 12, fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, zIndex: 9999, boxShadow: '0 4px 20px rgba(0,0,0,.3)', whiteSpace: 'nowrap', animation: 'slideUp .3s ease' }}>
+      <Bell size={15} color="#42A5F5"/>{msg}
+    </div>
+  );
+}
 
-        {/* captured complaint photo */}
-        {complaint.photoURL && (
-          <div style={{margin:'12px 20px 0',borderRadius:10,overflow:'hidden',height:90}}>
-            <img src={complaint.photoURL} alt="complaint" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+/* ─── SCREEN 1: MAP HOME ─── */
+function MapHome({ onReport, myReports, liveToast }) {
+  const { complaints } = useApp();
+  
+  // FIX: Map load hote hi world view na dikhaye, isliye default state me hi Nagpur Railway Station ke exact coordinates set kar diye hain
+  const [userLocation, setUserLocation] = useState({ lat: 21.15230, lng: 79.08820 });
+  const mapComplaints = complaints ? complaints.filter(c => c.lat && c.lng) : [];
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        p => {
+          // Agar user location mil jaye toh setup karega, varna Nagpur continuous focused rahega
+          setUserLocation({ lat: p.coords.latitude, lng: p.coords.longitude });
+        },
+        err => {
+          console.error("Using Nagpur Station target coordinates:", err);
+          setUserLocation({ lat: 21.15230, lng: 79.08820 });
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    }
+  }, []);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div style={{ background: `linear-gradient(135deg,${C.navy} 0%,${C.blue} 100%)`, padding: '12px 18px 10px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <div style={{ width: 20, height: 14, borderRadius: 2, overflow: 'hidden', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            <div style={{ flex: 1, background: '#FF9933' }}/><div style={{ flex: 1, background: '#fff' }}/><div style={{ flex: 1, background: '#138808' }}/>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,.65)', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Indian Railways · Nagpur Division</span>
+        </div>
+        <div style={{ color: '#fff', fontSize: 17, fontWeight: 800, marginBottom: 1 }}>Swachh Rail — Nagpur</div>
+        <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 11 }}>Report garbage near you · No login needed</div>
+      </div>
+
+      <div style={{ flex: 1, position: 'relative', minHeight: 200 }}>
+        {userLocation ? (
+          // FIX: Zoom level ko 15 se badhakar 16 kiya taaki seedhe station yards aur platforms monitor ho skein
+          <LiveMap complaints={mapComplaints} center={[userLocation.lat, userLocation.lng]} zoom={16} height="100%"/>
+        ) : (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.surface, color: C.text3, fontSize: 13, fontWeight: 600 }}>
+            Synchronizing live satellite positions...
           </div>
         )}
+        
+        <button onClick={onReport} style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: C.blue, color: C.white, padding: '13px 26px', borderRadius: 99, fontWeight: 800, fontSize: 14, border: 'none', cursor: 'pointer', boxShadow: `0 4px 20px ${C.blue}66`, display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap', zIndex: 500 }}>
+          <Camera size={18}/> Report Garbage
+        </button>
 
-        <div style={{padding:'12px 20px 0'}}>
-          <div style={{fontSize:12,color:C.text3,marginBottom:10}}>Select an active cleaner to assign this task:</div>
-          {myCleaners.map(cl=>(
-            <div key={cl.id} onClick={()=>onAssign(complaint.id, cl)}
-              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer',marginBottom:8,transition:'background .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.background=C.blueL}
-              onMouseLeave={e=>e.currentTarget.style.background=''}>
-              <div style={{width:36,height:36,borderRadius:'50%',background:`linear-gradient(135deg,${C.blue},${C.purple})`,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0}}>
-                {cl.name.split(' ').map(w=>w[0]).join('')}
-              </div>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:13}}>{cl.name}</div>
-                <div style={{fontSize:11.5,color:C.text3}}>{cl.area} · {cl.phone}</div>
-              </div>
-              <UserCheck size={16} color={C.green}/>
-            </div>
-          ))}
+        <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(10,22,40,.85)', color: '#fff', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, zIndex: 400, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Shield size={12} color="#42A5F5"/>{mapComplaints.length} active reports
         </div>
+      </div>
+
+      <div style={{ background: C.white, borderTop: `1px solid ${C.border}`, padding: '10px 14px', maxHeight: 185, overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>Your Reports ({myReports.length})</div>
+        {myReports.length === 0 && (
+          <div style={{ fontSize: 12, color: C.text3, textAlign: 'center', padding: '10px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <MapPin size={13} color={C.text3}/> Tap the button above to make your first report
+          </div>
+        )}
+        {myReports.map(r => (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: `1px solid ${C.border}`, background: C.surface }}>
+              {r.photoURL ? <img src={r.photoURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Image size={14} color={C.text3}/></div>}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontFamily: 'monospace', color: C.text3 }}>{String(r.id)}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.gtype} — {r.area}</div>
+              <div style={{ fontSize: 11, color: C.text3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Clock size={10}/>
+                Just now
+                <MapPin size={10} style={{ marginLeft: 4 }}/>Nagpur
+              </div>
+            </div>
+            <StatusBadge status={r.status}/>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: C.white, borderTop: `1px solid ${C.border}`, display: 'flex', flexShrink: 0 }}>
+        {[{ Icon: MapPin, l: 'Map', on: true }, { Icon: Image, l: 'Reports' }, { Icon: Navigation, l: 'Help' }].map(b => (
+          <button key={b.l} style={{ flex: 1, padding: '9px 4px', textAlign: 'center', cursor: 'pointer', border: 'none', background: 'none' }}>
+            <b.Icon size={19} color={b.on ? C.blue : C.text3} style={{ display: 'block', margin: '0 auto 2px' }}/>
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: b.on ? C.blue : C.text3 }}>{b.l}</span>
+          </button>
+        ))}
+      </div>
+
+      {liveToast && <LiveToast msg={liveToast} onDone={() => {}}/>}
+      <style>{`@keyframes slideUp{from{opacity:0;transform:translate(-50%,20px)}to{opacity:1;transform:translate(-50%,0)}}`}</style>
+    </div>
+  );
+}
+
+/* ─── SCREEN 2: CAMERA ─── */
+function CameraScreen({ onCapture, onBack }) {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const activeRequestRef = useRef(null);
+  
+  const [gps, setGps] = useState(null);
+  const [camReady, setCamReady] = useState(false);
+  const [camErr, setCamErr] = useState(null);
+  const [facing, setFacing] = useState(
+    window.location.hostname === "localhost" ? "user" : "environment"
+  );
+  const [flash, setFlash] = useState(false);
+
+  const startCamera = useCallback(async (facingMode) => {
+    if (activeRequestRef.current === facingMode && streamRef.current) return;
+    activeRequestRef.current = facingMode;
+
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      
+      let constraints;
+      if (window.location.hostname === "localhost") {
+        constraints = {
+          video: { width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        };
+      } else {
+        constraints = {
+          video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        };
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (activeRequestRef.current !== facingMode) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+      
+      if (videoRef.current) { 
+        videoRef.current.srcObject = stream; 
+        videoRef.current.setAttribute('playsinline', true);
+        
+        await videoRef.current.play().catch(err => {
+          if (err.name !== 'AbortError') throw err;
+          console.log("Safely bypassed DOM render exception stream.");
+        });
+        
+        setCamReady(true); 
+        setCamErr(null); 
+      }
+    } catch(e) {
+      console.error("Camera access failed:", e);
+      if (facingMode === 'environment') {
+        setFacing('user');
+      } else {
+        setCamErr('Camera hardware not responding or strictly locked by another application process.');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    startCamera(facing);
+    
+    return () => { 
+      activeRequestRef.current = null;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [facing, startCamera]);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        p => {
+          setGps({ lat: p.coords.latitude.toFixed(5), lng: p.coords.longitude.toFixed(5) });
+        },
+        err => {
+          setGps({ lat: "21.15230", lng: "79.08820" });
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      setGps({ lat: "21.15230", lng: "79.08820" });
+    }
+  }, []);
+
+  const flipCamera = () => {
+    if (!camReady) return;
+    const next = facing === 'environment' ? 'user' : 'environment';
+    setCamReady(false);
+    setFacing(next);
+  };
+
+  const shoot = () => {
+    if (!camReady || !canvasRef.current || !videoRef.current || !gps) return;
+    setFlash(true);
+    setTimeout(() => setFlash(false), 180);
+    
+    const v = videoRef.current;
+    const c = canvasRef.current;
+    c.width = v.videoWidth || 640; 
+    c.height = v.videoHeight || 480;
+    
+    const ctx = c.getContext('2d');
+    if (facing === 'user') { ctx.translate(c.width, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    const dataURL = c.toDataURL('image/jpeg', 0.85);
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+    }
+    onCapture(dataURL, gps);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: '#000', overflow: 'hidden', position: 'relative' }}>
+      <canvas ref={canvasRef} style={{ display: 'none' }}/>
+      
+      <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between', padding: '12px 16px', position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, background: 'linear-gradient(to bottom,rgba(0,0,0,.65),transparent)' }}>
+        <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,.45)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={18} color="#fff"/></button>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: gps ? 'rgba(46,125,50,.85)' : 'rgba(211,47,47,.85)', padding: '5px 12px', borderRadius: 99 }}>
+          <MapPin size={12} color="#fff"/>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>
+            {gps ? `${gps.lat}°N, ${gps.lng}°E` : 'Syncing Live Location...'}
+          </span>
+        </div>
+       
+        <button onClick={flipCamera} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,.45)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <RotateCcw size={16} color="#fff"/>
+        </button>
+      </div>
+
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {flash && <div style={{ position: 'absolute', inset: 0, background: '#fff', zIndex: 20, opacity: .85 }} />}
+        {camErr ? (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
+            <AlertTriangle size={40} color="#E65100"/>
+            <div style={{ color: '#fff', textAlign: 'center', fontSize: 13, lineHeight: 1.6 }}>{camErr}</div>
+          </div>
+        ) : (
+          <>
+            <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: facing === 'user' ? 'scaleX(-1)' : 'none' }}/>
+            {[{ t: 18, l: 18, bw: '3px 0 0 3px', br: '4px 0 0 0' }, { t: 18, r: 18, bw: '3px 3px 0 0', br: '0 4px 0 0' }, { b: 18, l: 18, bw: '0 0 3px 3px', br: '0 0 0 4px' }, { b: 18, r: 18, bw: '0 3px 3px 0', br: '0 0 4px 0' }].map((g, i) => (
+              <div key={i} style={{ position: 'absolute', width: 44, height: 44, borderColor: 'rgba(255,255,255,.75)', borderStyle: 'solid', borderWidth: g.bw, borderRadius: g.br, top: g.t, left: g.l, right: g.r, bottom: g.b }}/>
+            ))}
+          </>
+        )}
+      </div>
+
+      <div style={{ background: '#111', padding: '18px 24px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ width: 36 }}/>
+        <button onClick={shoot} disabled={!camReady || !gps}
+          style={{ width: 72, height: 72, borderRadius: '50%', background: camReady && gps ? C.white : '#555', border: '4px solid rgba(255,255,255,.3)', cursor: camReady && gps ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: camReady && gps ? C.white : '#444', border: `3px solid ${C.border}` }}/>
+        </button>
+        <button onClick={flipCamera} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,.1)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <RotateCcw size={17} color="rgba(255,255,255,.7)"/>
+        </button>
       </div>
     </div>
   );
 }
 
-/* ─── TASK INBOX ─── */
-function TaskInbox({ tasks, onAction, onSelect, onAssignCleaner }) {
-  const active = tasks.filter(c => !['COMPLETED','REJECTED'].includes(c.status));
+//* ─── SCREEN 3: TYPE PICKER ─── */
+function PickerScreen({ photoURL, onSelect, onBack }) {
+  const [sel, setSel] = useState(null);
   return (
-    <>
-      <div className="page-hd">
-        <div className="page-title">My Tasks</div>
-        <div className="page-sub">Nagpur Railway Stations · {new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}</div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))',gap:10,marginBottom:16}}>
-        <KPI label="Total"  value={tasks.length}/>
-        <KPI label="New"    value={tasks.filter(c=>c.status==='NEW').length}          color={C.amber}/>
-        <KPI label="Active" value={tasks.filter(c=>c.status==='IN_PROGRESS').length}  color={C.blue}/>
-        <KPI label="Done"   value={tasks.filter(c=>c.status==='COMPLETED').length}    color={C.green}/>
-      </div>
-      {active.length===0
-        ? <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:36,textAlign:'center',color:C.text3}}>🎉 All tasks completed for today!</div>
-        : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:14}}>
-            {active.map(c=>(
-              <ComplaintCard key={c.id} complaint={c} onClick={()=>onSelect(c)} actions={<>
-                {c.status==='NEW'&&<Btn onClick={e=>{e.stopPropagation();onAction(c.id,'ACCEPTED');}} color={C.blue} Icon={CheckCircle2} sm>Accept</Btn>}
-                {c.status==='ACCEPTED'&&!c.assignedTo&&<Btn onClick={e=>{e.stopPropagation();onAssignCleaner(c);}} color={C.purple} Icon={UserCheck} sm>Assign Cleaner</Btn>}
-                {c.status==='ACCEPTED'&&c.assignedTo&&<Btn onClick={e=>{e.stopPropagation();onAction(c.id,'IN_PROGRESS');}} color={C.purple} outline sm Icon={Navigation2}>Start</Btn>}
-                {c.status==='IN_PROGRESS'&&<Btn onClick={e=>{e.stopPropagation();onAction(c.id,'COMPLETED');}} color={C.green} Icon={CheckCircle2} sm>Mark Done</Btn>}
-                <Btn onClick={e=>{e.stopPropagation();onSelect(c);}} outline color={C.gray} sm>Details</Btn>
-              </>}/>
-            ))}
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <TopBar title="What did you photograph?" onBack={onBack}/>
+      
+      <div style={{ height: 110, background: '#000', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+        <img src={photoURL} alt="captured" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: .55 }}/>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifycontent: 'center' }}>
+          <div style={{ background: 'rgba(0,0,0,.6)', color: '#fff', padding: '5px 13px', borderRadius: 99, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Image size={13}/> Classify your photo
           </div>
-      }
-    </>
-  );
-}
-
-/* ─── CLEANERS TAB ─── */
-function CleanersTab({ tasks }) {
-  const myCleaners = CLEANERS.filter(c => c.vendorId === 'v1');
-  return (
-    <>
-      <div className="page-hd"><div className="page-title">My Cleaners</div><div className="page-sub">Staff assigned to your zones</div></div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:14}}>
-        {myCleaners.map(cl=>{
-          const assigned = tasks.filter(t=>t.assignedTo===cl.name);
-          const done     = assigned.filter(t=>t.cleanerStatus==='DONE');
+        </div>
+      </div>
+      
+      <div style={{ padding: '12px 16px 4px', color: C.text3, fontSize: 12, flexShrink: 0, fontWeight: 600 }}>
+        Select the closest match:
+      </div>
+      
+      {/* FIXED: Grid ko single column list me badal diya hai gap kam karke */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 16px', overflowY: 'auto', flex: 1 }}>
+        {GARBAGE_TYPES.map(g => {
+          const Icon = GTYPE_ICONS[g.label] || Trash2;
+          const isSelected = sel === g.id;
           return (
-            <div key={cl.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-                <div style={{width:44,height:44,borderRadius:'50%',background:`linear-gradient(135deg,${C.blue},${C.purple})`,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,flexShrink:0}}>
-                  {cl.name.split(' ').map(w=>w[0]).join('')}
+            <div 
+              key={g.id} 
+              onClick={() => setSel(g.id)}
+              style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: isSelected ? C.blueL : C.surface, 
+                border: `1.5px solid ${isSelected ? C.blue : C.border}`, 
+                borderRadius: 12, 
+                padding: '10px 14px', 
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {/* Left Side: Icon + Label */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ 
+                  background: isSelected ? C.white : C.grayL, 
+                  padding: 6, 
+                  borderRadius: 8, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center' 
+                }}>
+                  <Icon size={18} color={isSelected ? C.blue : C.gray}/>
                 </div>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:700,fontSize:14}}>{cl.name}</div>
-                  <div style={{fontSize:12,color:C.text3}}>{cl.area}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? C.blue : C.text2 }}>
+                  {g.label}
                 </div>
-                <span style={{background:cl.active?C.greenL:C.grayL,color:cl.active?C.green:C.gray,padding:'2px 9px',borderRadius:99,fontSize:11,fontWeight:700}}>{cl.active?'Active':'Off Duty'}</span>
               </div>
-              <div style={{display:'flex',gap:0,background:C.surface,borderRadius:10,overflow:'hidden',border:`1px solid ${C.border}`,marginBottom:10}}>
-                {[['Assigned',assigned.length],['Done',done.length],['Pending',assigned.length-done.length]].map(([l,v],i)=>(
-                  <div key={l} style={{flex:1,padding:'9px 6px',textAlign:'center',borderRight:i<2?`1px solid ${C.border}`:'none'}}>
-                    <div style={{fontSize:9.5,fontWeight:700,color:C.text3,textTransform:'uppercase',letterSpacing:.5,marginBottom:3}}>{l}</div>
-                    <div style={{fontWeight:800,fontSize:18}}>{v}</div>
-                  </div>
-                ))}
-              </div>
-              {/* tasks assigned to this cleaner */}
-              {assigned.slice(0,2).map(t=>(
-                <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderTop:`1px solid ${C.border}`}}>
-                  <div style={{width:32,height:32,borderRadius:6,overflow:'hidden',flexShrink:0,border:`1px solid ${C.border}`,background:C.surface}}>
-                    {t.photoURL?<img src={t.photoURL} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>📷</div>}
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:11.5,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.area}</div>
-                    <div style={{fontSize:10.5,color:C.text3}}>{timeAgo(t.reportedAt)}</div>
-                  </div>
-                  <span style={{background:t.cleanerStatus==='DONE'?C.greenL:C.amberL,color:t.cleanerStatus==='DONE'?C.green:C.amber,padding:'2px 7px',borderRadius:99,fontSize:10,fontWeight:700}}>
-                    {t.cleanerStatus==='DONE'?'Cleaned':t.cleanerStatus==='CLEANING'?'Cleaning':'Assigned'}
+
+              {/* Right Side: Urgent Tag or Dot indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {g.severity === 'critical' && (
+                  <span style={{ fontSize: 9, color: C.red, fontWeight: 800, background: C.redL, padding: '2px 6px', borderRadius: 4, letterSpacing: 0.5 }}>
+                    URGENT
                   </span>
+                )}
+                <div style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  border: `2px solid ${isSelected ? C.blue : C.gray}`,
+                  background: isSelected ? C.blue : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {isSelected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.white }} />}
                 </div>
-              ))}
+              </div>
+
             </div>
           );
         })}
       </div>
-    </>
-  );
-}
-
-/* ─── TASK MAP TAB ─── */
-function TaskMapTab({ tasks, onSelect }) {
-  const withCoords = tasks.filter(c=>c.lat&&c.lng);
-  return (
-    <>
-      <div className="page-hd"><div className="page-title">Task Map</div><div className="page-sub">Live Nagpur complaint locations</div></div>
-      <div style={{display:'flex',gap:7,flexWrap:'wrap',marginBottom:10}}>
-        {['NEW','ACCEPTED','IN_PROGRESS','COMPLETED'].map(s=>{
-          const dots={NEW:'🔴',ACCEPTED:'🔵',IN_PROGRESS:'🟣',COMPLETED:'🟢'};
-          const labels={NEW:'New',ACCEPTED:'Accepted',IN_PROGRESS:'In Progress',COMPLETED:'Done'};
-          return <span key={s} style={{fontSize:11.5,background:C.white,border:`1px solid ${C.border}`,padding:'3px 10px',borderRadius:99,display:'flex',gap:4,alignItems:'center'}}>{dots[s]} {labels[s]}</span>;
-        })}
+      
+      <div style={{ padding: '12px 16px 16px', flexShrink: 0, background: C.white, borderTop: `1px solid ${C.border}` }}>
+        <button 
+          disabled={!sel} 
+          onClick={() => onSelect(GARBAGE_TYPES.find(g => g.id === sel))}
+          style={{ 
+            width: '100%', 
+            background: sel ? C.blue : C.grayL, 
+            color: sel ? C.white : C.gray, 
+            padding: '13px', 
+            borderRadius: 12, 
+            fontSize: 14.5, 
+            fontWeight: 800, 
+            border: 'none', 
+            cursor: sel ? 'pointer' : 'not-allowed', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: 8 
+          }}
+        >
+          Continue <ChevronLeft size={18} style={{ transform: 'rotate(180deg)' }}/>
+        </button>
       </div>
-      <LiveMap complaints={withCoords} center={[21.1458,79.0882]} zoom={14} height="300px" onPinClick={onSelect}/>
-      <div style={{marginTop:14,display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12}}>
-        {withCoords.slice(0,4).map(c=>(
-          <div key={c.id} onClick={()=>onSelect(c)} style={{display:'flex',gap:10,background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px',cursor:'pointer',alignItems:'center'}}
-            onMouseEnter={e=>e.currentTarget.style.background=C.blueL} onMouseLeave={e=>e.currentTarget.style.background=C.white}>
-            <div style={{width:40,height:40,borderRadius:8,overflow:'hidden',flexShrink:0,background:C.surface,border:`1px solid ${C.border}`}}>
-              {c.photoURL?<img src={c.photoURL} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<MapPin size={16} color={C.text3} style={{margin:'12px auto',display:'block'}}/>}
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:11,fontFamily:'monospace',color:C.text3}}>{c.id}</div>
-              <div style={{fontSize:13,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.area} — {c.gtype}</div>
-              <div style={{fontSize:11,color:C.text3,display:'flex',alignItems:'center',gap:4}}><Clock size={10}/>{timeAgo(c.reportedAt)}</div>
-            </div>
-            <Badge status={c.status}/>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-/* ─── STATS TAB ─── */
-function StatsTab({ tasks }) {
-  const rate = calcResolutionRate(tasks);
-  const avg  = avgResolutionTime(tasks);
-  const done = tasks.filter(c=>c.status==='COMPLETED').length;
-  return (
-    <>
-      <div className="page-hd"><div className="page-title">Statistics</div><div className="page-sub">Performance overview</div></div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:14}}>
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
-          <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>Completion Rate</div>
-          <div style={{display:'flex',alignItems:'center',gap:16}}>
-            <div style={{width:80,height:80,borderRadius:'50%',background:`conic-gradient(${C.green} 0% ${rate}%,#ECEFF1 ${rate}% 100%)`,position:'relative',flexShrink:0}}>
-              <div style={{position:'absolute',inset:10,borderRadius:'50%',background:C.white,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:16}}>{rate}%</div>
-            </div>
-            <div>
-              <div style={{fontSize:13,color:C.text3,marginBottom:5}}>Today</div>
-              <div><span style={{color:C.green,fontWeight:700}}>{done} done</span> / {tasks.length} total</div>
-              <div style={{fontSize:12,color:C.text3,marginTop:4}}>Avg: <strong>{avg} min</strong></div>
-            </div>
-          </div>
-          <ProgressBar value={rate} color={C.green} height={6}/>
-        </div>
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:18}}>
-          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Breakdown</div>
-          {['NEW','ACCEPTED','IN_PROGRESS','COMPLETED','QUERIED'].map(s=>(
-            <div key={s} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
-              <Badge status={s}/><span style={{fontWeight:700,fontSize:14}}>{tasks.filter(c=>c.status===s).length}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ─── MAIN VENDOR PORTAL ─── */
-export default function VendorPortal() {
-  const { complaints, updateComplaint } = useApp();
-  const [tab,           setTab]           = useState('tasks');
-  const [selected,      setSelected]      = useState(null);
-  const [assigning,     setAssigning]     = useState(null); // complaint being assigned
-  const [notif,         setNotif]         = useState(null);
-  const [liveToast,     setLiveToast]     = useState(null);
-
-  const myTasks = complaints.filter(c => c.vendor?.id === 'v1');
-
-  // Listen for new complaints from user
-  useEffect(() => {
-    const unsub = bus.on('NEW_COMPLAINT', (c) => {
-      if (c.vendor?.id !== 'v1') return;
-      setLiveToast(`🔔 New complaint: ${c.id} — ${c.area}`);
-      setTimeout(() => setLiveToast(null), 5000);
-    });
-    return unsub;
-  }, []);
-
-  const act = (id, status) => {
-    updateComplaint(id, { status });
-    if (selected?.id === id) setSelected(s => ({...s, status}));
-    const msgs = { ACCEPTED:'Task accepted', IN_PROGRESS:'Task started', COMPLETED:'Task completed!', QUERIED:'Query raised' };
-    setNotif(msgs[status] || 'Updated');
-  };
-
-  const handleAssignCleaner = (complaintId, cleaner) => {
-    updateComplaint(complaintId, {
-      assignedTo:    cleaner.name,
-      cleanerStatus: 'ASSIGNED',
-      status:        'ACCEPTED',
-    });
-    setAssigning(null);
-    setNotif(`Assigned to ${cleaner.name}`);
-  };
-
-  const navItems = [
-    { key:'tasks',    icon:'📋', label:'Tasks',    count: myTasks.filter(c=>c.status==='NEW').length },
-    { key:'cleaners', icon:'👷', label:'Cleaners'  },
-    { key:'map',      icon:'🗺️', label:'Task Map'  },
-    { key:'stats',    icon:'📊', label:'Stats'     },
-  ];
-
-  return (
-    <div style={{display:'flex',height:'100vh',fontFamily:'DM Sans,system-ui,sans-serif',overflow:'hidden'}}>
-      <Sidebar title="Nagpur CleanRail" subtitle="Vendor Portal" navItems={navItems} activeTab={tab} onTabChange={setTab}
-        footerUser={{initials:'RP',name:'Ramesh Patil',role:'Vendor Manager',avatarColor:C.blue}}/>
-
-      <div style={{flex:1,overflowY:'auto',background:C.surface,display:'flex',flexDirection:'column'}}>
-        {/* live toast banner */}
-        {liveToast&&(
-          <div style={{background:C.navy,color:'#fff',padding:'10px 18px',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:8,borderBottom:`1px solid rgba(255,255,255,.1)`,flexShrink:0}}>
-            <Bell size={15} color="#42A5F5"/>{liveToast}
-            <button onClick={()=>setLiveToast(null)} style={{marginLeft:'auto',background:'none',border:'none',color:'rgba(255,255,255,.5)',cursor:'pointer',fontSize:16}}>✕</button>
-          </div>
-        )}
-        {notif && <NotifBanner msg={notif} type="green" onDone={()=>setNotif(null)}/>}
-        <div style={{padding:22,maxWidth:900,margin:'0 auto',width:'100%'}}>
-          {tab==='tasks'    && <TaskInbox tasks={myTasks} onAction={act} onSelect={setSelected} onAssignCleaner={c=>setAssigning(c)}/>}
-          {tab==='cleaners' && <CleanersTab tasks={myTasks}/>}
-          {tab==='map'      && <TaskMapTab  tasks={myTasks} onSelect={setSelected}/>}
-          {tab==='stats'    && <StatsTab    tasks={myTasks}/>}
-        </div>
-      </div>
-
-      {selected   && <VendorComplaintModal complaint={selected} onClose={()=>setSelected(null)} onAction={(id,s)=>{act(id,s);setSelected(null);}}/>}
-      {assigning  && <AssignCleanerModal complaint={assigning} onClose={()=>setAssigning(null)} onAssign={handleAssignCleaner}/>}
-
-      <style>{`
-        .page-hd{margin-bottom:18px}.page-title{font-size:18px;font-weight:800;color:#0D1117;margin-bottom:2px}.page-sub{font-size:12px;color:#7A8FA6}
-        @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-        @media(max-width:639px){.sidebar{display:none}}
-      `}</style>
     </div>
   );
 }
-// VENDOREOF
-// echo "Done"
+/* ─── SCREEN 4: CONFIRM ─── */
+function ConfirmScreen({ photoURL, gtype, gps, onSend, onBack, isSubmitting }) {
+  // FIX: Default hardcoded Delhi ki jagah hum humesha first default mock station array element ko capture karenge
+  const [station, setStation] = useState(STATIONS[0]?.name || "Nagpur Railway Station");
+  const [area, setArea] = useState(AREAS[0]);
+  const [note, setNote] = useState('');
+  const [zoom, setZoom] = useState(false);
+  const Icon = GTYPE_ICONS[gtype.label] || Trash2;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <TopBar title="Confirm & Send" onBack={onBack}/>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ position: 'relative', background: '#000' }}>
+          <img src={photoURL} alt="garbage" style={{ width: '100%', maxHeight: 210, objectFit: 'cover', display: 'block' }}/>
+          <button onClick={() => setZoom(true)} style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,.55)', border: 'none', borderRadius: 8, padding: '4px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: '#fff', fontSize: 11, fontWeight: 600 }}>
+            <ZoomIn size={12}/> View full
+          </button>
+          <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Icon size={12}/> {gtype.label}
+          </div>
+        </div>
+        <div style={{ padding: '13px 15px' }}>
+          <div style={{ background: C.greenL, border: '1px solid #C8E6C9', borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
+            <MapPin size={15} color={C.green}/>
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.green }}>Location captured — Nagpur</div>
+              <div style={{ fontSize: 10.5, color: C.green, fontFamily: 'monospace' }}>{gps?.lat}°N, {gps?.lng}°E</div>
+            </div>
+          </div>
+          <div style={{ borderRadius: 10, overflow: 'hidden', marginBottom: 11, border: `1px solid ${C.border}` }}>
+            <LiveMap singlePin singleCoords={gps} height="120px" zoom={16}/>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 5 }}>Nearest Station</label>
+            {/* FIX: Dropdown select handles exact binding cleanly now */}
+            <select value={station} onChange={e => setStation(e.target.value)} style={{ width: '100%', padding: '9px 11px', border: `1px solid ${C.border}`, borderRadius: 9, fontSize: 13, fontFamily: 'inherit', background: C.white }}>
+              {STATIONS.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 5 }}>Exact Area</label>
+            <select value={area} onChange={e => setArea(e.target.value)} style={{ width: '100%', padding: '9px 11px', border: `1px solid ${C.border}`, borderRadius: 9, fontSize: 13, fontFamily: 'inherit', background: C.white }}>
+              {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 5 }}>Note <span style={{ textTransform: 'none', fontWeight: 400 }}>(optional)</span></label>
+            <textarea value={note} onChange={e => setNote(e.target.value)} maxLength={200} placeholder="Describe what you see…"
+              style={{ width: '100%', padding: '9px 11px', border: `1px solid ${C.border}`, borderRadius: 9, fontSize: 13, minHeight: 56, resize: 'none', fontFamily: 'inherit' }}/>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: '11px 14px 15px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 9, flexShrink: 0, background: C.white }}>
+        <button onClick={onBack} disabled={isSubmitting} style={{ background: C.surface, color: C.text2, padding: '11px 13px', borderRadius: 11, fontSize: 13, fontWeight: 600, border: `1px solid ${C.border}`, cursor: 'pointer' }}>Back</button>
+        <button onClick={() => onSend({ gtype, station, area, note, lat: gps?.lat, lng: gps?.lng, photoURL })} disabled={isSubmitting}
+          style={{ flex: 1, background: isSubmitting ? C.gray : C.blue, color: C.white, padding: '12px', borderRadius: 11, fontSize: 14, fontWeight: 800, border: 'none', cursor: isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, boxShadow: `0 2px 12px ${C.blue}55` }}>
+          <Send size={16}/> {isSubmitting ? 'Sending...' : 'Send Report'}
+        </button>
+      </div>
+      {zoom && (
+        <div onClick={() => setZoom(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.93)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img src={photoURL} alt="fullscreen" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }}/>
+          <button onClick={() => setZoom(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={18} color="#fff"/></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── SCREEN 5: SUCCESS ─── */
+function SuccessScreen({ ticket, photoURL, gps, gtype, station, onDone }) {
+  const Icon = GTYPE_ICONS[gtype?.label] || Trash2;
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <img src={photoURL} alt="reported" style={{ width: '100%', height: 170, objectFit: 'cover', display: 'block', filter: 'brightness(.6)' }}/>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <CheckCircle2 size={48} color="#4CAF50" strokeWidth={1.5}/>
+          <div style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>Report Sent!</div>
+          <div style={{ color: 'rgba(255,255,255,.7)', fontSize: 12 }}>Vendor notified instantly</div>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 0' }}>
+        <div style={{ background: C.navy, color: '#fff', borderRadius: 14, padding: '13px 18px', marginBottom: 13 }}>
+          <div style={{ fontSize: 9.5, opacity: .5, fontWeight: 700, letterSpacing: .5, textTransform: 'uppercase', marginBottom: 2 }}>Ticket Number</div>
+          <div style={{ fontSize: 21, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2 }}>{String(ticket)}</div>
+          <div style={{ fontSize: 10.5, opacity: .5, marginTop: 3 }}>Screenshot to track your complaint</div>
+        </div>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 13px', marginBottom: 11 }}>
+          {[
+            ['Type', <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon size={13}/>{gtype?.label}</span>],
+            ['Station', station],
+            ['GPS', `${gps?.lat}°N, ${gps?.lng}°E`],
+            ['Reported', 'Just now']
+          ].map(([k, v], i, a) => (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < a.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+              <span style={{ fontSize: 12.5, color: C.text2 }}>{k}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.text, maxWidth: 180, textAlign: 'right' }}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 11, border: `1px solid ${C.border}` }}>
+          <LiveMap singlePin singleCoords={gps} height="130px" zoom={16}/>
+        </div>
+      </div>
+      <div style={{ padding: '11px 16px 18px', borderTop: `1px solid ${C.border}`, flexShrink: 0, background: C.white }}>
+        <button onClick={onDone} style={{ width: '100%', background: C.blue, color: C.white, padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+          <MapPin size={16}/> Back to Map
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── MAIN USER PORTAL ─── */
+export default function UserPortal() {
+  const { addComplaint } = useApp();
+  const [screen, setScreen] = useState('map');
+  const [photoURL, setPhotoURL] = useState(null);
+  const [gps, setGps] = useState(null);
+  const [gtype, setGtype] = useState(null);
+  const [ticket, setTicket] = useState(null);
+  const [sentData, setSentData] = useState(null);
+  const [myReports, setMyReports] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSend = async (data) => {
+    if (isSubmitting) return;
+    try {
+      setIsSubmitting(true);
+      
+      const result = await addComplaint({
+        gtype: data.gtype.label,
+        severity: data.gtype.severity,
+        station: data.station,
+        area: data.area,
+        note: data.note,
+        lat: data.lat,
+        lng: data.lng,
+        photoURL: data.photoURL,
+      });
+
+      const finalTicketId = (result && typeof result !== 'object') 
+        ? String(result) 
+        : `SR-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      setTicket(finalTicketId);
+      setSentData(data);
+      
+      setMyReports(p => [{
+        id: finalTicketId, 
+        gtype: data.gtype.label, 
+        emoji: '📷',
+        area: data.area, 
+        photoURL: data.photoURL,
+        station: { name: data.station }, 
+        status: 'NEW', 
+        reportedAt: new Date(),
+        lat: parseFloat(data.lat), 
+        lng: parseFloat(data.lng),
+      }, ...p]);
+
+      setScreen('success');
+    } catch (error) {
+      console.error("Critical error inside portal submit stream:", error);
+      alert("Database dispatch error. Please check your network/credentials configuration.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ width: '100%', maxWidth: 430, margin: '0 auto', background: C.white, display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'DM Sans,system-ui,sans-serif', overflow: 'hidden' }}>
+      {screen === 'map' && <MapHome onReport={() => setScreen('camera')} myReports={myReports}/>}
+      {screen === 'camera' && <CameraScreen onCapture={(url, g) => { setPhotoURL(url); setGps(g); setScreen('picker'); }} onBack={() => setScreen('map')}/>}
+      {screen === 'picker' && <PickerScreen photoURL={photoURL} onSelect={g => { setGtype(g); setScreen('confirm'); }} onBack={() => setScreen('camera')}/>}
+      {screen === 'confirm' && gtype && (
+        <ConfirmScreen 
+          photoURL={photoURL} 
+          gtype={gtype} 
+          gps={gps} 
+          onSend={handleSend} 
+          onBack={() => setScreen('picker')}
+          isSubmitting={isSubmitting}
+        />
+      )}
+      {screen === 'success' && ticket && sentData && (
+        <SuccessScreen 
+          ticket={ticket} 
+          photoURL={photoURL} 
+          gps={gps} 
+          gtype={gtype} 
+          station={sentData.station} 
+          onDone={() => setScreen('map')}
+        />
+      )}
+    </div>
+  );
+}

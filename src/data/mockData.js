@@ -1,11 +1,14 @@
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
 
 export const STATIONS = [
-  { id: 's1', name: 'New Delhi Railway Station', code: 'NDLS', zone: 'Northern Railway', lat: 28.6419, lng: 77.2194 },
-  { id: 's2', name: 'Mumbai CST', code: 'CSMT', zone: 'Central Railway', lat: 18.9398, lng: 72.8354 },
-  { id: 's3', name: 'Chennai Central', code: 'MAS', zone: 'Southern Railway', lat: 13.0827, lng: 80.2707 },
-  { id: 's4', name: 'Howrah Station', code: 'HWH', zone: 'Eastern Railway', lat: 22.5839, lng: 88.3422 },
-  { id: 's5', name: 'Bangalore City Junction', code: 'SBC', zone: 'South Western Railway', lat: 12.9784, lng: 77.5724 },
+  { 
+    id: 's1', 
+    name: 'Nagpur Railway Station', 
+    code: 'NGP', 
+    zone: 'Central Railway', 
+    lat: 21.15230, 
+    lng: 79.08820 
+  }
 ];
 
 export const VENDORS = [
@@ -23,8 +26,22 @@ export const GARBAGE_TYPES = [
   { id: 'g6', emoji: '💧', label: 'Sewage / Water', severity: 'critical' },
 ];
 
-export const AREAS = ['Platform 1', 'Platform 3', 'Platform 5', 'Waiting Area', 'Parking Lot', 'Footbridge', 'Ticket Counter', 'Track Area', 'Food Court', 'Toilet Block', 'Entry Gate', 'Exit Gate'];
-
+export const AREAS = [
+  'Platform 1 (Main Entry)',
+  'Platform 2',
+  'Platform 3',
+  'Platform 4',
+  'Platform 5',
+  'Platform 6 (Santaraj Entry)',
+  'Main Waiting Hall',
+  'Foot Over Bridge (FOB) - Central',
+  'Foot Over Bridge (FOB) - Itwari Side',
+  'Circulating Area (Main Gate)',
+  'Santaracha Side Parking',
+  'Reservation Ticket Counter',
+  'Running Room & Yard Area',
+  'Food Plaza (Platform 1)'
+];
 export const STATUS_META = {
   NEW:         { dot: '🔴', color: '#E65100', bg: '#FFF3E0', label: 'New' },
   ACCEPTED:    { dot: '🔵', color: '#1565C0', bg: '#E3F2FD', label: 'Accepted' },

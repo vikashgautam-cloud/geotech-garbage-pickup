@@ -22,21 +22,15 @@ const STATUS_COLORS = {
 };
 
 /**
- * LiveMap — renders a Leaflet map with complaint pins.
- * Props:
- *   complaints   – array of complaint objects (need .lat .lng .status .id .gtype .station)
- *   center       – [lat, lng] default center
- *   zoom         – default zoom
- *   height       – CSS height string
- *   onPinClick   – (complaint) => void
- *   highlightId  – id of complaint to emphasize
- *   singlePin    – if true, renders only a single animated "you are here" pin at center
- *   singleCoords – { lat, lng } for single pin mode
+ * LiveMap — Renders a Leaflet map with complaint pins.
+ * Default view is strictly locked to Nagpur Railway Station.
  */
 export default function LiveMap({
   complaints = [],
-  center = [22.5937, 78.9629],
-  zoom = 5,
+  // Changed from India center to Nagpur Railway Station coordinates
+  center = [21.1523, 79.0882], 
+  // Increased zoom level from 5 to 16 to directly show station and tracks
+  zoom = 16, 
   height = '320px',
   onPinClick,
   highlightId,
@@ -136,8 +130,8 @@ export default function LiveMap({
         .bindPopup(`
           <div style="font-family:DM Sans,sans-serif;min-width:170px">
             <div style="font-size:11px;font-family:monospace;color:#888;margin-bottom:3px">${c.id}</div>
-            <div style="font-weight:700;font-size:13px;margin-bottom:4px">${c.emoji} ${c.gtype}</div>
-            <div style="font-size:12px;color:#555;margin-bottom:6px">📍 ${c.station?.name || ''}</div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:4px">${c.emoji || '📌'} ${c.gtype || 'Report'}</div>
+            <div style="font-size:12px;color:#555;margin-bottom:6px">📍 ${c.station?.name || c.station || 'Nagpur Junction'}</div>
             <div style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;background:${color}22;color:${color}">
               ${c.status}
             </div>
@@ -148,7 +142,7 @@ export default function LiveMap({
       markersRef.current.push(m);
     });
 
-    // Fit bounds to all markers
+    // Fit bounds or fallback logic
     if (complaints.length > 0 && !singlePin) {
       const validPts = complaints.filter(c => c.lat && c.lng);
       if (validPts.length > 1) {
@@ -156,8 +150,11 @@ export default function LiveMap({
           map.fitBounds(validPts.map(c => [parseFloat(c.lat), parseFloat(c.lng)]), { padding: [30, 30] });
         } catch(e) {}
       } else if (validPts.length === 1) {
-        map.setView([parseFloat(validPts[0].lat), parseFloat(validPts[0].lng)], 14);
+        map.setView([parseFloat(validPts[0].lat), parseFloat(validPts[0].lng)], 16);
       }
+    } else if (!singlePin) {
+      // FIX: Agar koi reports nahi hain (0 active reports), toh view wapas Nagpur Station par set ho jayega
+      map.setView(center, zoom);
     }
   }
 
