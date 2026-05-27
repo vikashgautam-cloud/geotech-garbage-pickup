@@ -3,7 +3,7 @@ import { useApp } from '../../App';
 import { Sidebar } from '../../components/Sidebar';
 import LiveMap from '../../components/LiveMap';
 
-// Firebase Structural Drivers
+// Firebase Drivers
 import { db } from '../../utils/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
@@ -54,6 +54,7 @@ export default function CleanerPortal() {
       let authenticatedStaff = null;
       let matchedStationId = 'Dynamic Station Node';
 
+      // Har ek Vendor doc check ho raha hai
       for (const vDoc of rootSnap.docs) {
         const subCleanersRef = collection(db, "vendors", vDoc.id, "cleaners");
         const subSnap = await getDocs(subCleanersRef);
@@ -65,7 +66,7 @@ export default function CleanerPortal() {
 
           if (dbLoginId === searchCleanerId && dbPassword === searchPassword) {
             authenticatedStaff = data;
-            matchedStationId = vDoc.id;
+            matchedStationId = vDoc.id; // Yeh auto-sync karega aapke platform naming rules ko
           }
         });
 
@@ -80,28 +81,45 @@ export default function CleanerPortal() {
         alert("Authentication Failed: Invalid ID/Password mismatch.");
       }
     } catch (err) {
-      console.error(err);
-      alert("Database stream failed.");
+      console.error("Authentication Loop Error:", err);
+      alert("Database matrix stream network sync failed (Status 400).");
     } finally {
       setIsAuthLoading(false);
     }
   };
 
-  // ── NATIVE HARDWARE CAMERA STREAM ENGINES ──
+  // ── NATIVE HARDWARE CAMERA STREAM ENGINES (FIXED ABORTERROR) ──
   const startDeviceCameraFeed = async () => {
     setCapturedPhoto(null);
     setIsCameraActive(true);
     try {
       const hardwareStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, // Back camera optimization for field work
+        video: { facingMode: 'environment', width: 640, height: 480 }, // optimized viewport dimensions
         audio: false
       });
+      
       if (videoRef.current) {
         videoRef.current.srcObject = hardwareStream;
+        
+        // Safety Catch Wrapper block embedded directly here
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log("Field camera stream matrix initiated successfully.");
+            })
+            .catch((err) => {
+              if (err.name === 'AbortError') {
+                console.warn("Camera play initialization safely intercepted during rapid re-render loop.");
+              } else {
+                console.error("Camera interface failure:", err);
+              }
+            });
+        }
       }
     } catch (err) {
       console.error("Camera access blocked: ", err);
-      alert("Hardware Blocked: Grant camera permissions inside browser address bar settings.");
+      alert("Hardware Blocked: Grant camera permissions inside browser settings.");
       setIsCameraActive(false);
     }
   };
@@ -109,21 +127,20 @@ export default function CleanerPortal() {
   const captureSnapshotFrame = () => {
     if (videoRef.current && canvasRef.current) {
       const ctx = canvasRef.current.getContext('2d');
-      const width = videoRef.current.videoWidth;
-      const height = videoRef.current.videoHeight;
+      const width = videoRef.current.videoWidth || 640;
+      const height = videoRef.current.videoHeight || 480;
       
       canvasRef.current.width = width;
       canvasRef.current.height = height;
       
-      // Draw image to matrix layout memory
+      // Draw image to canvas component memory
       ctx.drawImage(videoRef.current, 0, 0, width, height);
       
-      // Conversion to lightweight fast Base64 transport string
+      // Conversion to lightweight Base64 string for direct upload
       const base64DataUrl = canvasRef.current.toDataURL('image/jpeg', 0.85);
       setCapturedPhoto(base64DataUrl);
       
-      // Stop ongoing track loops to save device battery
-      stopDeviceCameraFeed();
+      stopDeviceCameraFeed(); // Stop track loops to save device battery
     }
   };
 
@@ -146,7 +163,7 @@ export default function CleanerPortal() {
       await updateComplaint(taskId, {
         status: 'CLEANED_BY_FORCE',
         cleanerStatus: 'DONE',
-        cleanerPhoto: capturedPhoto // Base64 buffer sent safely to collection mapping
+        cleanerPhoto: capturedPhoto 
       });
 
       alert("Success! Live photo proof dispatched to Vendor verification layout dashboard.");
@@ -250,7 +267,7 @@ export default function CleanerPortal() {
                       boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: '#1E293B' }}>📍 {t.area || 'Platform Site Area'}</div>
                       {isDispatched && (
                         <span style={{ background: '#D97706', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>Awaiting Audit</span>
@@ -276,10 +293,8 @@ export default function CleanerPortal() {
 
                 <LiveMap singlePin={true} singleCoords={{ lat: selected.lat, lng: selected.lng }} height="130px" />
 
-                {/* RESOLVED: DEEP SCANNING INPUT LAYERS FOR CITIZEN VISUAL PICTURES */}
                 <div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', display: 'block', marginBottom: 6 }}>⚠️ CITIZEN INITIAL DISPATCH TRACE (BEFORE CLEAN):</span>
-                  {/* Dynamic checking of variable mutations inside Firestore objects */}
                   {(selected.imageUrl || selected.image || selected.photoUrl || selected.photo) ? (
                     <img 
                       src={selected.imageUrl || selected.image || selected.photoUrl || selected.photo} 
@@ -294,25 +309,23 @@ export default function CleanerPortal() {
                   )}
                 </div>
 
-                {/* RESOLVED INTERFACE LAYER: NATIVE STREAM DIGITAL CAPTURING PROCESSOR */}
                 <div style={{ marginTop: 'auto', borderTop: '1px solid #E2E8F0', paddingTop: 12 }}>
                   <h4 style={{ margin: '0 0 6px 0', fontSize: 12, color: '#0F172A', fontWeight: 800 }}>🛠️ CLEANER DEPLOYMENT CLOSEOUT ACTION</h4>
                   
                   {selected.status === 'ASSIGNED_TO_CLEANER' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       
-                      {/* Hidden operational frame component used for matrix transformation parsing */}
                       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-                      {/* Camera Capture View Window Layer */}
+                      {/* Camera View Window Layer */}
                       {isCameraActive && (
                         <div style={{ background: '#000', borderRadius: 10, overflow: 'hidden', position: 'relative', display: 'flex' }}>
-                          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: 160, objectFit: 'cover' }} />
+                          <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: 160, objectFit: 'cover' }} />
                           <button onClick={captureSnapshotFrame} type="button" style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', background: '#EF4444', color: '#fff', border: 'none', borderRadius: '50%', width: 44, height: 44, cursor: 'pointer', fontSize: 16, boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>📸</button>
                         </div>
                       )}
 
-                      {/* Captured Frame State Preview Mirror Screen */}
+                      {/* Preview Mirror */}
                       {capturedPhoto && (
                         <div>
                           <span style={{ fontSize: 10, color: '#059669', fontWeight: 700, display: 'block', marginBottom: 4 }}>✓ FRESH PHOTO ATTACHED SUCCESSFULLY:</span>
@@ -320,7 +333,6 @@ export default function CleanerPortal() {
                         </div>
                       )}
 
-                      {/* Unified Trigger Controls Panel */}
                       {!isCameraActive && (
                         <button onClick={startDeviceCameraFeed} type="button" style={{ background: '#2563EB', color: '#fff', border: 'none', borderRadius: 8, padding: 12, fontWeight: 700, fontSize: 12, cursor: 'pointer', textAlign: 'center' }}>
                           📷 {capturedPhoto ? "Retake / Re-Open Camera Stream" : "Open Camera & Capture Clean Photo"}

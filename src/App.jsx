@@ -3,10 +3,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from './utils/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
+// Existing Portals
 import UserPortal from './pages/user/UserPortal';
 import VendorPortal from './pages/vendor/VendorPortal';
 import AdminPortal from './pages/admin/AdminPortal';
 import CleanerPortal from './pages/cleaner/CleanerPortal';
+import MaterialDept from './pages/Material Dept/MaterialDept';
+import MaterialWorker from './pages/Material Worker/MaterialWorker';
 
 const AppContext = createContext();
 
@@ -35,25 +38,21 @@ export function AppProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  // FIXED: Strictly capturing both Station logic and Image streams cleanly
   const addComplaint = async (newC) => {
     try {
       const ticketId = `TKT-${String(complaints.length + 1001)}`;
       
-      // Strict Extraction Checklist for image/photo key combinations
       let base64Payload = null;
       if (newC.image) base64Payload = newC.image;
       else if (newC.photo) base64Payload = newC.photo;
       else if (newC.cleanerPhoto) base64Payload = newC.cleanerPhoto;
       else if (typeof newC === 'object' && Object.keys(newC).length > 0) {
-        // Fallback: search object for anything containing valid base64 markers
         const keys = Object.keys(newC);
         const imgKey = keys.find(k => typeof newC[k] === 'string' && newC[k].startsWith('data:image'));
         if (imgKey) base64Payload = newC[imgKey];
       }
 
-      // FIXED STATION CHECK: Strict search for target keywords inside input fields
-      let selectedStationName = 'Nagpur Junction'; // Default set to Nagpur strictly
+      let selectedStationName = 'Nagpur Junction'; 
       
       if (typeof newC.station === 'string' && newC.station.trim().length > 0) {
         selectedStationName = newC.station;
@@ -63,7 +62,6 @@ export function AppProvider({ children }) {
         selectedStationName = newC.station.name;
       }
 
-      // Check if text deliberately states Delhi, else fallback to standard NGP execution
       const isDelhi = selectedStationName.toLowerCase().includes('delhi');
       const selectedStationCode = isDelhi ? 'NDLS' : 'NGP';
       const printableStationName = isDelhi ? 'New Delhi Railway Station' : 'Nagpur Junction';
@@ -79,8 +77,8 @@ export function AppProvider({ children }) {
         lat: parseFloat(newC.lat) || 21.16542,
         lng: parseFloat(newC.lng) || 79.08095,
         desc: newC.desc || '',
-        image: base64Payload,              // Direct storage mapping
-        cleanerPhoto: base64Payload,       // Multi-channel view synchronizer
+        image: base64Payload,              
+        cleanerPhoto: base64Payload,       
         reportedBy: newC.reportedBy || 'Citizen (App)',
         station: { 
           id: selectedStationCode === 'NDLS' ? 'ndls_01' : 'ngp_01', 
@@ -102,7 +100,9 @@ export function AppProvider({ children }) {
     try {
       const docRef = doc(db, "complaints", docId);
       await updateDoc(docRef, fields);
-    } catch (e) { console.error("Error executing atomic transaction document mutation: ", e); }
+    } catch (e) { 
+      console.error("Error executing atomic transaction document mutation: ", e); 
+    }
   };
 
   return (
@@ -130,11 +130,12 @@ export default function App() {
 
   return (
     <AppProvider>
+      {/* Dynamic Nav Pill Control bar extended for 6 paths */}
       <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 99999, display: 'flex', gap: 8, background: '#0A1628', padding: '8px 12px', borderRadius: 30, boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
-        {['/', '/vendor', '/admin', '/cleaner'].map((p, idx) => {
-          const names = ['Camera App', 'Vendor', 'Admin HQ', 'Cleaner Force'];
+        {['/', '/vendor', '/admin', '/cleaner', '/material-dept', '/material-worker'].map((p, idx) => {
+          const names = ['Camera App', 'Vendor', 'Admin HQ', 'Cleaner Force', 'Material Dept', 'Material Worker'];
           return (
-            <button key={p} onClick={() => navigate(p)} style={{ background: route === p ? '#1565C0' : '#1A2638', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            <button key={p} onClick={() => navigate(p)} style={{ background: route === p ? '#1565C0' : '#1A2638', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {names[idx]}
             </button>
           )
@@ -148,8 +149,15 @@ export default function App() {
 function RenderRouteEngine({ currentPath }) {
   const { loading } = useApp();
   if (loading) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontFamily: 'sans-serif', background: '#F7F9FC', color: '#0A1628' }}>Initializing Railway Node Ecosystem...</div>;
+  
+  // Custom Path Evaluation
   if (currentPath === '/vendor') return <VendorPortal />;
   if (currentPath === '/admin') return <AdminPortal />;
   if (currentPath === '/cleaner') return <CleanerPortal />;
+  
+  // ── NEW RENDER CONDITIONS FOR STORAGE CORE MODULAR PAGES ──
+  if (currentPath === '/material-dept') return <MaterialDept />;
+  if (currentPath === '/material-worker') return <MaterialWorker />;
+  
   return <UserPortal />;
 }

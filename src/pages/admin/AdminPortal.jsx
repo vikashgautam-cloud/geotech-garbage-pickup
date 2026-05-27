@@ -1,4 +1,3 @@
-// src/pages/admin/AdminPortal.jsx
 import { db } from '../../utils/firebase'; 
 import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
@@ -272,17 +271,46 @@ function LiveMapTab({ complaints, onSelect }) {
   );
 }
 
-/* ── SUB-TAB 3: VENDORS CRUD CONTROL ── */
+/* ── SUB-TAB 3: VENDORS CRUD CONTROL (UPDATED WITH AREA DROPDOWN) ── */
 function DynamicVendorsTab({ complaints, vendors, onAddVendor, onDeleteVendor }) {
   const [vId, setVId] = useState('');
   const [vPass, setVPass] = useState('');
   const [vName, setVName] = useState('');
   const [vStation, setVStation] = useState('Nagpur Junction');
+  const [vType, setVType] = useState('GARBAGE'); // Default Strategy Configuration
+  const [vArea, setVArea] = useState('platform no 1'); // NEW AREA DROPDOWN STATE
+
+  // Pre-defined Area Selection Array
+  const AREAS = [
+  'Platform 1 (Main Entry)',
+  'Platform 2',
+  'Platform 3',
+  'Platform 4',
+  'Platform 5',
+  'Platform 6 (Santaraj Entry)',
+  'Main Waiting Hall',
+  'Foot Over Bridge (FOB) - Central',
+  'Foot Over Bridge (FOB) - Itwari Side',
+  'Circulating Area (Main Gate)',
+  'Santaracha Side Parking',
+  'Reservation Ticket Counter',
+  'Running Room & Yard Area',
+  'Food Plaza (Platform 1)'
+];
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!vId.trim() || !vPass || !vName.trim()) return alert("Please fill all form values.");
-    onAddVendor({ id: vId.trim(), password: vPass, name: vName.trim(), stationName: vStation });
+    
+    onAddVendor({ 
+      id: vId.trim(), 
+      password: vPass, 
+      name: vName.trim(), 
+      stationName: vStation, 
+      vendorType: vType,
+      areaName: vArea // Forwarding dropdown area key
+    });
+
     setVId(''); setVPass(''); setVName('');
   };
 
@@ -290,25 +318,44 @@ function DynamicVendorsTab({ complaints, vendors, onAddVendor, onDeleteVendor })
     <>
       <div className="page-hd"><div className="page-title">Operational Network Vendors</div><div className="page-sub">Provision and deregister platform management groups</div></div>
       
+      {/* Expanded Submission Terminal with Selection Dropdowns */}
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, background: '#fff', padding: 14, borderRadius: 12, border: '1px solid #DDE3E9', marginBottom: 20, alignItems: 'flex-end' }}>
-        <div style={{ flex: 1, minWidth: 130 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#546E7A', display: 'block', marginBottom: 4 }}>VENDOR ID</span>
           <input type="text" value={vId} onChange={e => setVId(e.target.value)} placeholder="vendor_ngp_01" style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #DDE3E9', boxSizing: 'border-box' }} />
         </div>
-        <div style={{ flex: 1, minWidth: 130 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#546E7A', display: 'block', marginBottom: 4 }}>ACCESS PASSWORD</span>
           <input type="password" value={vPass} onChange={e => setVPass(e.target.value)} placeholder="••••••••" style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #DDE3E9', boxSizing: 'border-box' }} />
         </div>
-        <div style={{ flex: 1, minWidth: 150 }}>
+        <div style={{ flex: 1, minWidth: 140 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#546E7A', display: 'block', marginBottom: 4 }}>CONTRACTOR FIRM NAME</span>
           <input type="text" value={vName} onChange={e => setVName(e.target.value)} placeholder="Ex: Khalsa Cleaning Services" style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #DDE3E9', boxSizing: 'border-box' }} />
         </div>
-        <div style={{ flex: 1, minWidth: 150 }}>
+        <div style={{ flex: 1, minWidth: 130 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#546E7A', display: 'block', marginBottom: 4 }}>ASSIGN STATION TERMINAL</span>
           <select value={vStation} onChange={e => setVStation(e.target.value)} style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #DDE3E9', background: '#fff', boxSizing: 'border-box' }}>
             {STATIONS.map(st => <option key={st.id} value={st.name}>{st.name}</option>)}
           </select>
         </div>
+
+        {/* NEW AREA / PLATFORM SELECTION DROP-DOWN */}
+        <div style={{ flex: 1, minWidth: 130 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#2E7D32', display: 'block', marginBottom: 4 }}>TARGET AREA / PLATFORM</span>
+          <select value={vArea} onChange={e => setVArea(e.target.value)} style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #2E7D32', background: '#E8F5E9', fontWeight: '700', boxSizing: 'border-box', color: '#1B5E20' }}>
+            {AREAS.map(area => <option key={area} value={area}>{area.toUpperCase()}</option>)}
+          </select>
+        </div>
+        
+        {/* LOGISTICS SECTOR TYPE SELECTOR DROP-DOWN */}
+        <div style={{ flex: 1, minWidth: 130 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#1565C0', display: 'block', marginBottom: 4 }}>LOGISTICS SECTOR TYPE</span>
+          <select value={vType} onChange={e => setVType(e.target.value)} style={{ width: '100%', padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #1565C0', background: '#FFF3E0', fontWeight: '700', boxSizing: 'border-box' }}>
+            <option value="GARBAGE">🚯 Garbage Cleaning</option>
+            <option value="MATERIAL">📦 Material Storage Hub</option>
+          </select>
+        </div>
+
         <button type="submit" style={{ padding: '8px 16px', background: '#2E7D32', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>+ Provision Vendor</button>
       </form>
 
@@ -320,10 +367,13 @@ function DynamicVendorsTab({ complaints, vendors, onAddVendor, onDeleteVendor })
           });
           const d = t.filter(c => c.status === 'COMPLETED').length;
           const pct = Math.round(d / (t.length || 1) * 100);
+          
+          const isMaterialVendor = v.vendorType === 'MATERIAL';
+
           return (
-            <div key={v.id} style={{ background: '#fff', border: '1px solid #DDE3E9', borderRadius: 14, padding: 18, position: 'relative' }}>
+            <div key={v.id} style={{ background: '#fff', border: isMaterialVendor ? '2px solid #1565C0' : '1px solid #DDE3E9', borderRadius: 14, padding: 18, position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#1565C0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: isMaterialVendor ? '#1E293B' : '#1565C0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                   {v.name ? v.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : 'VN'}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -332,19 +382,39 @@ function DynamicVendorsTab({ complaints, vendors, onAddVendor, onDeleteVendor })
                 </div>
                 <button onClick={() => onDeleteVendor(v.id)} style={{ background: 'none', border: 'none', color: '#B71C1C', fontSize: 15, cursor: 'pointer', padding: '4px' }}>🗑️</button>
               </div>
-              <div style={{ marginBottom: 10 }}><span style={{ background: '#F7F9FC', border: '1px solid #DDE3E9', borderRadius: 99, fontSize: 11, padding: '2px 9px' }}>📍 {String(v.stationName || '')}</span></div>
-              <div style={{ display: 'flex', background: '#F7F9FC', borderRadius: 9, overflow: 'hidden', border: '1px solid #DDE3E9', marginBottom: 10 }}>
-                <div style={{ flex: 1, padding: '9px 6px', textAlign: 'center', borderRight: '1px solid #DDE3E9' }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#7A8FA6', textTransform: 'uppercase' }}>Assigned</div>
-                  <div style={{ fontWeight: 800, fontSize: 16 }}>{t.length}</div>
-                </div>
-                <div style={{ flex: 1, padding: '9px 6px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#7A8FA6', textTransform: 'uppercase' }}>Done</div>
-                  <div style={{ fontWeight: 800, fontSize: 16 }}>{d}</div>
-                </div>
+              
+              {/* Badges Display Block (Added Area Node Render) */}
+              <div style={{ marginBottom: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ background: '#F7F9FC', border: '1px solid #DDE3E9', borderRadius: 99, fontSize: 11, padding: '2px 9px' }}>📍 {String(v.stationName || '')}</span>
+                <span style={{ background: '#FFF3E0', border: '1px solid #FFB74D', color: '#E65100', borderRadius: 99, fontSize: 11, fontWeight: '700', padding: '2px 9px' }}>🚪 {String(v.areaName || 'platform no 1').toUpperCase()}</span>
+                <span style={{ background: isMaterialVendor ? '#E0F7FA' : '#E8F5E9', border: `1px solid ${isMaterialVendor ? '#00ACC1' : '#4CAF50'}`, color: isMaterialVendor ? '#006064' : '#1B5E20', borderRadius: 99, fontSize: 10, fontWeight: '800', padding: '2px 8px' }}>
+                  {isMaterialVendor ? '📦 MATERIAL HUB' : '🚯 GARBAGE CLEAN'}
+                </span>
               </div>
-              <div style={{ fontSize: 11, color: '#7A8FA6', marginBottom: 3 }}>Live SLA Close Efficiency ({pct}%)</div>
-              <SafeProgressBar value={pct} color="#2E7D32" height={5} />
+
+              {!isMaterialVendor ? (
+                <>
+                  <div style={{ display: 'flex', background: '#F7F9FC', borderRadius: 9, overflow: 'hidden', border: '1px solid #DDE3E9', marginBottom: 10 }}>
+                    <div style={{ flex: 1, padding: '9px 6px', textAlign: 'center', borderRight: '1px solid #DDE3E9' }}>
+                      <div style={{ fontSize: 9.5, fontWeight: 700, color: '#7A8FA6', textTransform: 'uppercase' }}>Assigned</div>
+                      <div style={{ fontWeight: 800, fontSize: 16 }}>{t.length}</div>
+                    </div>
+                    <div style={{ flex: 1, padding: '9px 6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 9.5, fontWeight: 700, color: '#7A8FA6', textTransform: 'uppercase' }}>Done</div>
+                      <div style={{ fontWeight: 800, fontSize: 16 }}>{d}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#7A8FA6', marginBottom: 3 }}>Live SLA Close Efficiency ({pct}%)</div>
+                  <SafeProgressBar value={pct} color="#2E7D32" height={5} />
+                </>
+              ) : (
+                <div style={{ background: '#F8FAFC', borderRadius: 10, padding: 12, border: '1px dashed #CBD5E1', marginTop: 10 }}>
+                  <div style={{ fontSize: 10, color: '#64748B', fontWeight: '700' }}>CURRENT INVENTORY LOGISTICS LEVEL:</div>
+                  <div style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 2 }}>
+                    {v.totalStockCurrent || 0} <span style={{ fontSize: 12, fontWeight: '500', color: '#475569' }}>Units on Hold</span>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -421,15 +491,18 @@ export default function AdminPortal() {
 
   const handleProvisionVendor = async (payload) => {
     try {
-      // Is code se vendor ID hi direct Firestore Document ID banegi!
+      // Added `areaName` mapping architecture persistent field update
       await setDoc(doc(db, "vendors", payload.id), {
         loginId: payload.id, 
         password: payload.password, 
         name: payload.name, 
         stationName: payload.stationName, 
+        areaName: payload.areaName || "platform no 1", // Saves selected layout field
+        vendorType: payload.vendorType || "GARBAGE", 
+        totalStockCurrent: payload.vendorType === "MATERIAL" ? 0 : null, 
         createdAt: serverTimestamp()
       });
-      setNotif(`Contract Node ${payload.id} successfully created inside grid.`);
+      setNotif(`Contract Node ${payload.id} [${payload.vendorType}] assigned to ${payload.areaName} successfully.`);
     } catch (err) {
       alert("Cloud database execution dropped profile upload query.");
     }
