@@ -143,7 +143,7 @@ const SBadge = ({status})=>{
 
 /* ── Task Card ── */
 function TaskCard({c,onAction,onSelect,onOpenAssignModal,onViewImage,t}) {
-  const img = c.image||c.photoURL||null;
+  const img = c.image||c.photoURL||c.imageUrl||c.photoUrl||c.photo||null;
   const stationName = typeof c.station==='object' ? c.station?.name : c.station;
   return (
     <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:10,overflow:'hidden',display:'flex',flexDirection:'column'}}>
@@ -496,10 +496,6 @@ export default function VendorPortal() {
     }
   `;
 
-  /* ════════════════════════════════════════
-     AUTH SCREEN — with header matching
-     material-worker login style
-  ════════════════════════════════════════ */
   if (!isAuthenticated) {
     return (
       <div style={{display:'flex',minHeight:'100vh',flexDirection:'column',background:dark?'#030810':'#F0F1F3',fontFamily:'IBM Plex Sans,sans-serif'}}>
@@ -706,9 +702,9 @@ export default function VendorPortal() {
   navItems={navItems}
   activeTab={tab}
   onTabChange={handleTabChange}
-  t={t}                              // ← add this
-  dark={dark}                        // ← add this
-  onToggleDark={()=>setDark(v=>!v)}  // ← add this
+  t={t}                              
+  dark={dark}                        
+  onToggleDark={()=>setDark(v=>!v)} 
   footerUser={{
     initials:(currentVendorData?.name||'VA').slice(0,2).toUpperCase(),
     name:currentVendorData?.name||'Vendor Admin',

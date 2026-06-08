@@ -40,39 +40,36 @@ export function AppProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  const addComplaint = async (newC) => {
-    try {
-      const ticketId = `TKT-${String(complaints.length + 1001)}`;
-      let base64Payload = newC.image || newC.photo || newC.cleanerPhoto;
-      
-      await addDoc(collection(db, "complaints"), {
-        customTicketId: ticketId,
-        status: 'NEW',
-        reportedAt: serverTimestamp(),
-        area: newC.area, 
-        gtype: newC.gtype,
-        severity: newC.severity,
-        lat: parseFloat(newC.lat),
-        lng: parseFloat(newC.lng),
-        desc: newC.desc,
-        image: base64Payload,
-        cleanerPhoto: base64Payload,
-        reportedBy: newC.reportedBy,
-        station: {
-          id: newC.station?.id,
-          name: newC.station?.name,
-          code: newC.station?.code,
-          zone: newC.station?.zone
-        },
-        assignedTo: null,
-        cleanerStatus: null,
-        resolutionMins: null,
-        resolvedAt: null
-      });
-    } catch (e) {
-      console.error("Error writing document: ", e);
-    }
-  };
+// App.jsx mein AppProvider ke andar ye sahi version rakhein
+const addComplaint = async (newC) => {
+  try {
+    // 1. Data validate karein ki kuch undefined na ho
+    const payload = {
+      customTicketId: `TKT-${String(complaints.length + 1001)}`,
+      status: 'NEW',
+      reportedAt: serverTimestamp(),
+      area: newC.area || "Unknown",
+      gtype: newC.gtype || "General",
+      severity: newC.severity || "normal",
+      lat: parseFloat(newC.lat) || 0,
+      lng: parseFloat(newC.lng) || 0,
+      desc: newC.desc || "", // Undefined ki jagah empty string
+      image: newC.image || newC.photo || newC.cleanerPhoto || "",
+      reportedBy: newC.reportedBy || "Anonymous",
+      station: {
+        id: newC.station?.id || null,
+        name: newC.station?.name || "Unknown",
+        code: newC.station?.code || "N/A",
+        zone: newC.station?.zone || "N/A"
+      }
+    };
+
+    await addDoc(collection(db, "complaints"), payload);
+    console.log("Complaint saved successfully!");
+  } catch (e) {
+    console.error("Firestore Error details: ", e);
+  }
+};
 
   const updateComplaint = async (docId, fields) => {
     try {
