@@ -754,7 +754,7 @@ function LoginScreen({ onLogin }) {
           <img src="/logo.jpeg" alt="Indian Railways" style={{ width: 44, height: 44, borderRadius: 8, background: '#fff', padding: 3, objectFit: 'contain', flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: '#E6EDF8', fontFamily: "'DM Sans', sans-serif" }}>ADMIN LOGIN</div>
-            <div style={{ fontSize: 10, color: '#4A5F80', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>ADMIN CENTRAL NODE · NAGPUR JN.</div>
+            <div style={{ fontSize: 10, color: '#4A5F80', fontFamily: "'DM Mono', monospace", marginTop: 2 }}> NAGPUR JUNCTION · CENTRAL RAILWAY</div>
           </div>
         </div>
         <form onSubmit={handleSubmit} style={{ padding: '22px 28px 28px' }}>

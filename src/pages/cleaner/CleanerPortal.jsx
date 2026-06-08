@@ -319,9 +319,19 @@ function LoginScreen({ onAuth }) {
         </button>
         <div className="cp-login-card">
           <div className="cp-login-header">
-            <div className="cp-login-avatar"><I.Broom /></div>
-            <div className="cp-login-title">Field Force Login</div>
-            <div className="cp-login-sub">GRWMS · Cleaner Portal</div>
+            <div className="cp-login-avatar">
+  <img
+    src="/logo.jpeg"
+    alt="Logo"
+    style={{
+      width: "60px",
+      height: "60px",
+      objectFit: "contain",
+    }}
+  />
+</div>
+            <div className="cp-login-title">Cleaner Login</div>
+            <div className="cp-login-sub">NAGPUR JUNCTION · CENTRAL RAILWAY</div>
           </div>
           {err && (
             <div className="cp-alert err"><I.Alert /><span>{err}</span></div>
@@ -431,7 +441,7 @@ export default function CleanerPortal() {
         <Sidebar
           title="Field Force Ledger"
           subtitle={`Operator: ${cleanerData?.name}`}
-          navItems={[{ key: 'JOBS', label: 'Assigned Sweeps', icon: <I.Broom />, count: activeTasks.length }]}
+          navItems={[{ key: 'JOBS', label: 'Assigned Sweeps', count: activeTasks.length }]}
           activeTab="JOBS"
           onTabChange={() => {}}
         />
@@ -464,7 +474,7 @@ export default function CleanerPortal() {
             <div className="cp-left">
               <div className="cp-card" style={{ flex: 1 }}>
                 <div className="cp-card-hd">
-                  <span className="cp-card-title"><I.Broom />Duty Worklist</span>
+                  <span className="cp-card-title">Duty Worklist</span>
                   <span className="badge b-count">{activeTasks.length}</span>
                 </div>
                 {activeTasks.length === 0 ? (
@@ -484,7 +494,7 @@ export default function CleanerPortal() {
                           background: done ? 'rgba(146,64,14,0.1)' : 'rgba(26,63,191,0.1)',
                           color: done ? t.amber : t.accent,
                         }}>
-                          <I.Broom />
+                          
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div className="cp-task-title" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -509,7 +519,7 @@ export default function CleanerPortal() {
             <div className="cp-right">
               {!selected ? (
                 <div className="cp-empty-state">
-                  <div className="cp-empty-state-icon"><I.Broom /></div>
+                  <div className="cp-empty-state-icon"></div>
                   <div className="cp-empty-state-text">
                     Select a job from the list<br />to view details and submit proof.
                   </div>
