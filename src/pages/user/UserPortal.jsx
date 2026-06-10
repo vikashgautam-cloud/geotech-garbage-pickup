@@ -747,24 +747,50 @@ export default function UserPortal() {
 
   const handleTabChange = (newTab)=>{ setTab(newTab); setScreen('home'); };
 
-  const handleSend = async(data)=>{
+// ── USERPORTAL FIX — only the handleSend function needs updating ──
+// In UserPortal.jsx, find handleSend and replace the addComplaint call with this:
+
+  const handleSend = async (data) => {
     if (isSubmitting) return;
     try {
       setIsSubmitting(true);
-      await addComplaint({gtype:data.gtype.label,severity:data.gtype.severity,station:data.station,area:data.area,note:data.note,lat:data.lat,lng:data.lng,photoURL:data.photoURL});
-      const finalTicketId=`SR-${Math.floor(100000+Math.random()*900000)}`;
+      await addComplaint({
+        gtype:      data.gtype.label,
+        severity:   data.gtype.severity,
+        station:    data.station,   // plain string — matches vendor filter in App.jsx
+        area:       data.area,
+        note:       data.note,
+        lat:        data.lat,
+        lng:        data.lng,
+        photoURL:   data.photoURL,  // canonical field name
+      });
+      const finalTicketId = `SR-${Math.floor(100000 + Math.random() * 900000)}`;
       setTicket(finalTicketId);
       setSentData(data);
-      setMyReports(prev=>[{id:finalTicketId,gtype:data.gtype.label,area:data.area,photoURL:data.photoURL,station:{name:data.station},status:'NEW',reportedAt:new Date(),lat:parseFloat(data.lat),lng:parseFloat(data.lng)},...prev]);
+      setMyReports(prev => [{
+        id:         finalTicketId,
+        gtype:      data.gtype.label,
+        area:       data.area,
+        photoURL:   data.photoURL,  
+        station:    data.station,
+        status:     'NEW',
+        reportedAt: new Date(),
+        lat:        parseFloat(data.lat),
+        lng:        parseFloat(data.lng),
+      }, ...prev]);
       setLiveToast(`Report ${finalTicketId} submitted!`);
       setScreen('success');
-    } catch(err) {
-      console.error('Portal submit error:',err);
+    } catch (err) {
+      console.error('Portal submit error:', err);
       alert('Submission failed. Please check your network connection.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+// Also in ConfirmScreen, the onSend call passes:
+// onSend({ gtype, station, area, note, lat: gps?.lat, lng: gps?.lng, photoURL })
+// This is already correct — no change needed there.
 
   const renderContent = ()=>{
     if (screen==='camera') return <CameraScreen onCapture={(url,g)=>{setPhotoURL(url);setGps(g);setScreen('picker');}} onBack={()=>setScreen('home')}/>;

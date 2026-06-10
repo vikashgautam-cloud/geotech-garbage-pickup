@@ -64,7 +64,8 @@ body{background:${t.bg};font-family:'DM Sans',sans-serif;}
 .ap-side.hidden{transform:translateX(-100%);}
 .ap-side-head{padding:16px 14px 13px;border-bottom:1px solid ${t.border};flex-shrink:0;}
 .ap-side-brand{display:flex;align-items:center;gap:10px;margin-bottom:0;}
-.ap-side-brand img{width:30px;height:30px;border-radius:5px;object-fit:contain;background:#fff;padding:2px;flex-shrink:0;}
+.ap-side-brand img{width:30px;height:30px;border-radius:5px;object-fit:
+;background:#fff;padding:2px;flex-shrink:0;}
 .ap-side-bname{font-size:12px;font-weight:700;color:${t.text};}
 .ap-side-bsub{font-size:9px;color:${t.text3};margin-top:1px;font-family:'DM Mono',monospace;letter-spacing:.5px;}
 .ap-nav{flex:1;padding:8px;overflow-y:auto;}
@@ -373,30 +374,46 @@ function Dashboard({ complaints, t, onSelect, onTabChange, onViewImage }) {
               const barColor = status === 'COMPLETED' ? t.green : status === 'ESCALATED' ? t.red : t.accent;
 
               return (
-                <div key={c.id} className="ap-icard">
-                  {/* Image */}
-                  <div
-                    className="ap-icard-img"
-                    onClick={() => c.cleanerPhoto && onViewImage(c.cleanerPhoto)}
-                    style={{ cursor: c.cleanerPhoto ? 'zoom-in' : 'default' }}
-                  >
-                    {c.cleanerPhoto ? (
-                      <>
-                        <img src={c.cleanerPhoto} alt="Evidence" />
-                        <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 3, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <I.Eye /> Expand
-                        </div>
-                      </>
-                    ) : (
-                      <div className="ap-no-photo">
-                        <I.Image />
-                        <span>No Photo</span>
-                      </div>
-                    )}
-                    <div style={{ position: 'absolute', top: 6, right: 6 }}>
-                      <span className={`badge ${statusBadgeClass(status)}`}>{status.replace('_', ' ')}</span>
-                    </div>
-                  </div>
+                <div key={c.id} className="ap-icard">{/* ── IMAGE SECTION FIXES START HERE ── */}
+<div
+  className="ap-icard-img"
+  onClick={() => {
+    // Agar cleaner ki photo hai toh wo dikhao, nahi toh user ki garbage photo dikhao
+    const activeImage = c.cleanerPhoto || c.photoURL;
+    if (activeImage) onViewImage(activeImage);
+  }}
+  style={{ cursor: (c.cleanerPhoto || c.photoURL) ? 'zoom-in' : 'default', position: 'relative' }}
+>
+  {c.cleanerPhoto ? (
+    // Case 1: Cleaner ne kaam khatam karke proof upload kar diya hai
+    <>
+      <img src={c.cleanerPhoto} alt="Cleaned Evidence" />
+      <div style={{ position: 'absolute', bottom: 6, left: 6, background: '#2E7D32', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 3, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>
+        ✓ Clean Proof
+      </div>
+    </>
+  ) : c.photoURL ? (
+    // Case 2: Nayi report hai, toh user ki kachre wali photo dikhao
+    <>
+      <img src={c.photoURL} alt="Garbage Reported" />
+      <div style={{ position: 'absolute', bottom: 6, left: 6, background: '#C62828', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 3, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>
+        ⚠ Garbage Spotted
+      </div>
+    </>
+  ) : (
+    // Case 3: Agar kisi ne bina photo ke dummy report daal di ho
+    <div className="ap-no-photo">
+      <I.Image />
+      <span>No Photo Available</span>
+    </div>
+  )}
+  
+  {/* Status Badge */}
+  <div style={{ position: 'absolute', top: 6, right: 6 }}>
+    <span className={`badge ${statusBadgeClass(status)}`}>{status.replace('_', ' ')}</span>
+  </div>
+</div>
+{/* ── IMAGE SECTION FIXES END HERE ── */}
 
                   {/* Body */}
                   <div className="ap-icard-body">
@@ -943,27 +960,19 @@ export default function AdminPortal() {
               <div className="ap-tbchip"><I.Bell /> {complaints.filter(c => safeStr(c.status) === 'NEW').length} new</div>
               <div className="ap-tbchip"><I.Alert /> {complaints.filter(c => safeStr(c.status) === 'ESCALATED').length} esc.</div>
               <button className="ap-tb-btn" onClick={() => setDark(v => !v)}>
-                {dark ? <><I.Sun /> Light</> : <><I.Moon /> Dark</>}
-              </button>
+                {dark ? <><I.Sun /> Light</> : <><I.Moon /> Dark</>}         </button>
               <button className="ap-tb-btn ap-tb-logout" onClick={() => setLoggedIn(false)}>
                 <I.Logout /> Sign Out
-              </button>
-            </div>
-          </div>
-
+              </button>         </div>       </div>
           {/* Content */}
           <div className="ap-content">
             {tab === 'dashboard' && <Dashboard {...sharedProps} />}
             {tab === 'map'       && <LiveMapTab {...sharedProps} />}
             {tab === 'vendors'   && <VendorsTab {...sharedProps} vendors={vendors} onAddVendor={handleProvisionVendor} onDeleteVendor={handleRevokeVendor} />}
             {tab === 'reports'   && <ReportsTab {...sharedProps} />}
-          </div>
-        </main>
-
+          </div>  </main>
         {selected && <AdminComplaintModal complaint={selected} onClose={() => setSelected(null)} onStatusChange={onStatusChange} />}
         <Lightbox src={lightbox} onClose={() => setLightbox(null)} />
         <Toast msg={toast.msg} onDone={() => setToast({ show: false, msg: '' })} />
       </div>
-    </>
-  );
-}
+    </> );}
