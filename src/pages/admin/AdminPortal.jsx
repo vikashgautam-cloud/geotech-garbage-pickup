@@ -374,46 +374,73 @@ function Dashboard({ complaints, t, onSelect, onTabChange, onViewImage }) {
               const barColor = status === 'COMPLETED' ? t.green : status === 'ESCALATED' ? t.red : t.accent;
 
               return (
-                <div key={c.id} className="ap-icard">{/* ── IMAGE SECTION FIXES START HERE ── */}
-<div
-  className="ap-icard-img"
-  onClick={() => {
-    // Agar cleaner ki photo hai toh wo dikhao, nahi toh user ki garbage photo dikhao
-    const activeImage = c.cleanerPhoto || c.photoURL;
-    if (activeImage) onViewImage(activeImage);
-  }}
-  style={{ cursor: (c.cleanerPhoto || c.photoURL) ? 'zoom-in' : 'default', position: 'relative' }}
->
-  {c.cleanerPhoto ? (
-    // Case 1: Cleaner ne kaam khatam karke proof upload kar diya hai
-    <>
-      <img src={c.cleanerPhoto} alt="Cleaned Evidence" />
-      <div style={{ position: 'absolute', bottom: 6, left: 6, background: '#2E7D32', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 3, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>
-        ✓ Clean Proof
-      </div>
-    </>
-  ) : c.photoURL ? (
-    // Case 2: Nayi report hai, toh user ki kachre wali photo dikhao
-    <>
-      <img src={c.photoURL} alt="Garbage Reported" />
-      <div style={{ position: 'absolute', bottom: 6, left: 6, background: '#C62828', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 3, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>
-        ⚠ Garbage Spotted
-      </div>
-    </>
-  ) : (
-    // Case 3: Agar kisi ne bina photo ke dummy report daal di ho
-    <div className="ap-no-photo">
-      <I.Image />
-      <span>No Photo Available</span>
-    </div>
-  )}
-  
-  {/* Status Badge */}
-  <div style={{ position: 'absolute', top: 6, right: 6 }}>
-    <span className={`badge ${statusBadgeClass(status)}`}>{status.replace('_', ' ')}</span>
-  </div>
-</div>
-{/* ── IMAGE SECTION FIXES END HERE ── */}
+                <div key={c.id} className="ap-icard">
+                  {/* ── NEW SPLIT/COMPACT IMAGE LAYOUT START ── */}
+                  <div 
+                    className="ap-icard-img-container" 
+                    style={{ 
+                      position: 'relative', 
+                      display: 'grid', 
+                      gridTemplateColumns: (c.photoURL && c.cleanerPhoto) ? '1fr 1fr' : '1fr', 
+                      height: '140px', 
+                      background: '#eee', 
+                      overflow: 'hidden' 
+                    }}
+                  >
+                    {/* LEFT / SINGLE SIDE: User Garbage Photo (Before) */}
+                    {c.photoURL ? (
+                      <div 
+                        style={{ position: 'relative', height: '100%', cursor: 'zoom-in' }}
+                        onClick={() => onViewImage(c.photoURL)}
+                      >
+                        <img 
+                          src={c.photoURL} 
+                          alt="Garbage Reported" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                        <div style={{ position: 'absolute', bottom: 6, left: 6, background: '#C62828', color: '#fff', fontSize: 8, padding: '2px 4px', borderRadius: 3, fontWeight: 700, fontFamily: "'DM Mono', monospace", zIndex: 2 }}>
+                          ⚠ BEFORE
+                        </div>
+                      </div>
+                    ) : (
+                      (!c.cleanerPhoto) && (
+                        <div className="ap-no-photo" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                          <I.Image />
+                          <span style={{ fontSize: 10 }}>No Before Photo</span>
+                        </div>
+                      )
+                    )}
+
+                    {/* RIGHT SIDE: Cleaner Proof Photo (After) */}
+                    {c.cleanerPhoto ? (
+                      <div 
+                        style={{ position: 'relative', height: '100%', cursor: 'zoom-in', borderLeft: '2px solid #fff' }}
+                        onClick={() => onViewImage(c.cleanerPhoto)}
+                      >
+                        <img 
+                          src={c.cleanerPhoto} 
+                          alt="Cleaned Evidence" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                        <div style={{ position: 'absolute', bottom: 6, right: 6, background: '#2E7D32', color: '#fff', fontSize: 8, padding: '2px 4px', borderRadius: 3, fontWeight: 700, fontFamily: "'DM Mono', monospace", zIndex: 2 }}>
+                          ✓ AFTER
+                        </div>
+                      </div>
+                    ) : (
+                      c.photoURL && (
+                        <div style={{ background: 'rgba(0,0,0,0.03)', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderLeft: '1px dashed #ccc', color: '#999' }}>
+                          <I.Broom size={16} />
+                          <span style={{ fontSize: 9, marginTop: 4 }}>Pending Clean</span>
+                        </div>
+                      )
+                    )}
+
+                    {/* Status Badge Overlaid on Top Right */}
+                    <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 3 }}>
+                      <span className={`badge ${statusBadgeClass(status)}`}>{status.replace('_', ' ')}</span>
+                    </div>
+                  </div>
+                  {/* ── NEW SPLIT/COMPACT IMAGE LAYOUT END ── */}
 
                   {/* Body */}
                   <div className="ap-icard-body">
@@ -591,18 +618,40 @@ function VendorsTab({ complaints, vendors, t, onAddVendor, onDeleteVendor }) {
         </form>
       </div>
 
-      {/* Vendor Grid */}
-      <div className="ap-card">
-        <div className="ap-card-hd">
-          <span className="ap-card-title"><I.Users /> Registered Contractors</span>
-          <span className="badge b-muted">{vendors.length} vendors</span>
-        </div>
-        <div className="ap-vgrid">
-          {vendors.map(v => {
-            const tickets = complaints.filter(c => safeId(c.vendorId) === v.id);
-            const done    = tickets.filter(c => safeStr(c.status) === 'COMPLETED').length;
-            const pct     = Math.round(done / (tickets.length || 1) * 100);
-            const isMat   = v.vendorType === 'MATERIAL';
+     {/* Vendor Grid */}
+<div className="ap-card">
+  <div className="ap-card-hd">
+    <span className="ap-card-title"><I.Users /> Registered Contractors</span>
+    <span className="badge b-muted">{vendors.length} vendors</span>
+  </div>
+  <div className="ap-vgrid">
+    {vendors.map(v => {
+      
+      // 🔥 BULLETPROOF FILTERING LOGIC
+      const tickets = complaints.filter(c => {
+        if (!c) return false;
+
+        // 1. Direct Vendor ID Check
+        const idMatch = safeId(c.vendorId) === v.id;
+
+        // 2. Deep Area Text Normalization (Spaces aur Case insensitivity fix karne ke liye)
+        const complaintArea = safeStr(c.area).trim().toLowerCase();
+        const vendorArea    = safeStr(v.areaName).trim().toLowerCase();
+        
+        // Agar complaint ke area text me vendor ka area text kahin bhi match hota hai
+        const areaMatch = complaintArea !== '' && vendorArea !== '' && 
+                          (complaintArea.includes(vendorArea) || vendorArea.includes(complaintArea));
+
+        return idMatch || areaMatch;
+      });
+
+      // 🔍 Debugging Logger: Ise check karke turant samajh aa jayega kyun nahi dikh raha
+      console.log(`Vendor: ${v.name} [Area: ${v.areaName}] -> Total Filtered Tickets: ${tickets.length}`);
+
+      const done    = tickets.filter(c => safeStr(c.status) === 'COMPLETED').length;
+      const pct     = Math.round(done / (tickets.length || 1) * 100);
+      const isMat   = v.vendorType === 'MATERIAL';
+      
             return (
               <div key={v.id} className="ap-vcard" style={{ border: `1px solid ${isMat ? t.accent : t.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>

@@ -6,60 +6,69 @@ import { KPI, ProgressBar, NotifBanner } from '../../components/UI';
 import LiveMap from '../../components/LiveMap';
 import { db } from '../../utils/firebase';
 import {
-  doc, getDoc, setDoc, deleteDoc,
+  doc, getDoc, setDoc, deleteDoc, query, where,
   collection, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 
-/* ── Theme Tokens ── */
+/* ── Premium UI Theme Tokens ── */
 const LIGHT = {
-  accent:'#1C3D8F', accentLight:'#EEF2FF', accentDark:'#0F2660',
-  green:'#0D6E52',  greenLight:'#E8F5F1',
-  red:'#A32D2D',    redLight:'#FDEFEF',
-  amber:'#854F0B',  amberLight:'#FFF8ED',
-  text:'#111827', text2:'#374151', text3:'#6B7280', text4:'#9CA3AF',
-  surface:'#FFFFFF', surface2:'#F7F8FA', surface3:'#ECEEF2',
-  border:'#D4D8E2',  border2:'#E8EAF0',
-  bg:'#F0F1F3', headerBg:'#1C3D8F', headerText:'#FFFFFF', sidebarBg:'#FFFFFF',
+  accent: '#1C3D8F', accentLight: '#EEF2FF', accentDark: '#0F2660',
+  green: '#0D6E52', greenLight: '#E8F5F1',
+  red: '#A32D2D', redLight: '#FDEFEF',
+  amber: '#854F0B', amberLight: '#FFF8ED',
+  text: '#111827', text2: '#374151', text3: '#6B7280', text4: '#9CA3AF',
+  surface: '#FFFFFF', surface2: '#F8FAFC', surface3: '#F1F5F9',
+  border: '#E2E8F0', border2: '#F1F5F9',
+  bg: '#F8FAFC', headerBg: '#1C3D8F', headerText: '#FFFFFF', sidebarBg: '#FFFFFF',
 };
+
 const DARK = {
-  accent:'#4F7FE8', accentLight:'#1A2A4A', accentDark:'#2250C4',
-  green:'#10B981',  greenLight:'#042F22',
-  red:'#F87171',    redLight:'#2D1515',
-  amber:'#FBBF24',  amberLight:'#2D2010',
-  text:'#F1F5F9', text2:'#CBD5E1', text3:'#94A3B8', text4:'#64748B',
-  surface:'#0F172A', surface2:'#1E293B', surface3:'#263347',
-  border:'#2D3F55',  border2:'#1E2D40',
-  bg:'#080F1E', headerBg:'#060D1A', headerText:'#F1F5F9', sidebarBg:'#0F172A',
+  accent: '#3B82F6', accentLight: '#1E293B', accentDark: '#1D4ED8',
+  green: '#10B981', greenLight: '#064E3B',
+  red: '#EF4444', redLight: '#451A1A',
+  amber: '#F59E0B', amberLight: '#451A03',
+  text: '#F8FAFC', text2: '#CBD5E1', text3: '#94A3B8', text4: '#64748B',
+  surface: '#0F172A', surface2: '#1E293B', surface3: '#334155',
+  border: '#334155', border2: '#1E293B',
+  bg: '#020617', headerBg: '#0F172A', headerText: '#F8FAFC', sidebarBg: '#0F172A',
 };
 
 const FONTS = `
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
   @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/tabler-icons.min.css');
 `;
 
-/* ── helper — pick first truthy image field ── */
 const getImg = c => c.photoURL || c.image || c.imageUrl || c.photo || c.photoUrl || null;
 
-/* ── Btn ── */
-const Btn = ({ children, onClick, color, outline=false, small=false, type='button', icon, t }) => {
+/* ── Premium Buttons ── */
+const Btn = ({ children, onClick, color, outline = false, small = false, type = 'button', icon, t, style }) => {
   const bg = color || t.accent;
   return (
     <button type={type} onClick={onClick} style={{
-      padding: small ? '5px 11px' : '8px 14px', borderRadius:5,
-      fontSize: small ? 11 : 12, fontWeight:600, cursor:'pointer',
+      padding: small ? '6px 12px' : '10px 16px', 
+      borderRadius: '8px',
+      fontSize: small ? '11px' : '13px', 
+      fontWeight: 600, 
+      cursor: 'pointer',
       background: outline ? 'transparent' : bg,
-      color: outline ? bg : '#fff',
-      border: outline ? `1px solid ${bg}` : 'none',
-      display:'inline-flex', alignItems:'center', gap:5,
-      fontFamily:'IBM Plex Sans, sans-serif', letterSpacing:'.02em',
+      color: outline ? bg : '#ffffff',
+      border: `1px solid ${bg}`,
+      display: 'inline-flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      gap: '6px',
+      fontFamily: 'Plus Jakarta Sans, sans-serif', 
+      transition: 'all 0.2s ease',
+      boxShadow: outline ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)',
+      ...style
     }}>
-      {icon && <i className={`ti ${icon}`} style={{ fontSize: small ? 12 : 14 }} aria-hidden="true" />}
+      {icon && <i className={`ti ${icon}`} style={{ fontSize: small ? '13px' : '15px' }} aria-hidden="true" />}
       {children}
     </button>
   );
 };
 
-/* ── Image Lightbox ── */
+/* ── Lightbox Component ── */
 function ImageLightbox({ imageUrl, onClose }) {
   useEffect(() => {
     if (!imageUrl) return;
@@ -70,245 +79,207 @@ function ImageLightbox({ imageUrl, onClose }) {
 
   if (!imageUrl) return null;
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position:'fixed', inset:0, background:'rgba(4,8,20,0.96)', zIndex:99999,
-        display:'flex', alignItems:'center', justifyContent:'center',
-        cursor:'zoom-out', backdropFilter:'blur(4px)',
-      }}
-    >
-      <div
-        style={{ position:'relative', maxWidth:'96vw', maxHeight:'96vh', display:'flex', flexDirection:'column', alignItems:'center' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* toolbar */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', padding:'0 0 10px', gap:10 }}>
-          <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)', fontFamily:'IBM Plex Mono,monospace', letterSpacing:'.04em', textTransform:'uppercase' }}>
-            Evidence Photo
-          </span>
-          <div style={{ display:'flex', gap:8 }}>
-            <a href={imageUrl} download target="_blank" rel="noreferrer"
-              style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', cursor:'pointer', width:32, height:32, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', textDecoration:'none' }}
-              aria-label="Download"
-            >
-              <i className="ti ti-download" style={{ fontSize:14 }} aria-hidden="true" />
-            </a>
-            <button onClick={onClose}
-              style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', cursor:'pointer', width:32, height:32, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center' }}
-              aria-label="Close"
-            >
-              <i className="ti ti-x" style={{ fontSize:14 }} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-        <img src={imageUrl} alt="Evidence" style={{ maxWidth:'100%', maxHeight:'calc(96vh - 60px)', borderRadius:8, objectFit:'contain', display:'block' }} />
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', marginTop:8, fontFamily:'IBM Plex Mono,monospace' }}>
-          Click outside or press ESC to close
-        </div>
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(2, 6, 23, 0.95)', zIndex: 99999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'zoom-out', backdropFilter: 'blur(8px)',
+    }}>
+      <div style={{ position: 'relative', maxWidth: '92vw', maxHeight: '92vh' }} onClick={e => e.stopPropagation()}>
+        <img src={imageUrl} alt="Evidence View" style={{ maxWidth: '100%', maxHeight: '92vh', borderRadius: '12px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', objectFit: 'contain' }} />
       </div>
     </div>
   );
 }
 
-/* ── Top Header Bar ── */
+/* ── Header Custom UI ── */
 function TopHeader({ t, dark, onToggleDark, vendorData, onLogout, onHamburger }) {
   return (
-    <div style={{
-      background: t.headerBg, padding:'0 16px',
-      display:'flex', alignItems:'center', justifyContent:'space-between',
-      height:52, flexShrink:0,
-      borderBottom:`1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.12)'}`,
+    <header style={{
+      background: t.headerBg, padding: '0 20px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      height: '64px', flexShrink: 0,
+      borderBottom: `1px solid ${t.border}`,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
     }}>
-      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <button onClick={onHamburger} className="vp-hamburger"
-          style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:5, width:34, height:34, cursor:'pointer', display:'none', alignItems:'center', justifyContent:'center', color:'#fff', flexShrink:0 }}
-          aria-label="Toggle menu"
-        >
-          <i className="ti ti-menu-2" style={{ fontSize:16 }} aria-hidden="true" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button onClick={onHamburger} className="vp-hamburger" style={{
+          background: 'transparent', border: 'none', color: dark ? '#fff' : t.text,
+          cursor: 'pointer', display: 'none', padding: '4px'
+        }}>
+          <i className="ti ti-menu-2" style={{ fontSize: '22px' }} />
         </button>
-        <div style={{ width:30, height:30, borderRadius:5, background:'rgba(255,255,255,0.12)', border:'1px solid rgba(255,255,255,0.18)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
-          <img src="/logo.jpeg" alt="Logo" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: `1px solid ${t.border}` }}>
+          <img src="/logo.jpeg" alt="Logo" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
         </div>
         <div>
-          <div style={{ fontSize:13, fontWeight:700, color:'#fff', letterSpacing:'-.01em', lineHeight:1 }}>Vendor Portal</div>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', fontFamily:'IBM Plex Mono,monospace', letterSpacing:'.05em', marginTop:2 }}>
-            {vendorData?.stationName || 'NAGPUR JUNCTION · CENTRAL RAILWAY'}
-          </div>
+          <h1 style={{ fontSize: '15px', fontWeight: 700, color: dark ? '#fff' : '#ffffff', margin: 0, fontFamily: 'Plus Jakarta Sans' }}>Vendor Management Workspace</h1>
+          <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', fontFamily: 'JetBrains Mono', margin: '2px 0 0' }}>
+            {vendorData?.stationName || 'NAGPUR JUNCTION · CR'}
+          </p>
         </div>
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <button onClick={onToggleDark}
-          style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:5, padding:'5px 9px', cursor:'pointer', display:'flex', alignItems:'center', gap:5, color:'rgba(255,255,255,0.8)', fontSize:10, fontWeight:600, fontFamily:'IBM Plex Sans,sans-serif' }}
-          aria-label="Toggle theme"
-        >
-          <i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} style={{ fontSize:14 }} aria-hidden="true" />
-          <span className="vp-hide-xs">{dark ? 'Light' : 'Dark'}</span>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button onClick={onToggleDark} style={{
+          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
+        }}>
+          <i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} style={{ fontSize: '18px' }} />
         </button>
+
         {vendorData && (
-          <div style={{ display:'flex', alignItems:'center', gap:7, padding:'4px 8px', background:'rgba(255,255,255,0.08)', borderRadius:5, border:'1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ width:24, height:24, borderRadius:4, background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff', fontFamily:'IBM Plex Mono,monospace' }}>
-              {(vendorData.name || 'VA').slice(0, 2).toUpperCase()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: t.accent, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, fontFamily: 'JetBrains Mono' }}>
+              {(vendorData.name || 'VD').slice(0, 2).toUpperCase()}
             </div>
             <div className="vp-hide-xs">
-              <div style={{ fontSize:11, fontWeight:600, color:'#fff', lineHeight:1 }}>{vendorData.name || 'Vendor Admin'}</div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', fontFamily:'IBM Plex Mono,monospace' }}>Vendor</div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', lineHeight: 1 }}>{vendorData.name || 'Vendor Panel'}</div>
             </div>
           </div>
         )}
-        <button onClick={onLogout}
-          style={{ background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:5, padding:'5px 9px', cursor:'pointer', display:'flex', alignItems:'center', gap:4, color:'rgba(255,255,255,0.7)', fontSize:10, fontWeight:600, fontFamily:'IBM Plex Sans,sans-serif' }}>
-          <i className="ti ti-logout" style={{ fontSize:13 }} aria-hidden="true" />
-          <span className="vp-hide-xs">Exit</span>
+
+        <button onClick={onLogout} style={{
+          background: t.red, color: '#fff', border: 'none', borderRadius: '8px',
+          padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Plus Jakarta Sans'
+        }}>
+          <i className="ti ti-logout" style={{ fontSize: '14px' }} />
+          <span className="vp-hide-xs">Logout</span>
         </button>
       </div>
-    </div>
+    </header>
   );
 }
 
-/* ── Status badges ── */
+/* ── Modern Status Badges ── */
 const STATUS_META = {
-  NEW:                { label:'New',             bg:'#FFF3E0', color:'#E65100' },
-  ACCEPTED:           { label:'Accepted',        bg:'#E3F2FD', color:'#1565C0' },
-  ASSIGNED_TO_CLEANER:{ label:'Assigned',        bg:'#EDE7F6', color:'#4527A0' },
-  CLEANED_BY_FORCE:   { label:'Awaiting Verify', bg:'#E8F5E9', color:'#2E7D32' },
-  COMPLETED:          { label:'Completed',       bg:'#E8F5E9', color:'#2E7D32' },
-  REJECTED:           { label:'Rejected',        bg:'#ECEFF1', color:'#546E7A' },
-  ESCALATED:          { label:'Escalated',       bg:'#FFEBEE', color:'#B71C1C' },
+  NEW: { label: 'New Ticket', bg: '#FEF3C7', color: '#D97706' },
+  ACCEPTED: { label: 'Accepted', bg: '#DBEAFE', color: '#2563EB' },
+  ASSIGNED_TO_CLEANER: { label: 'Assigned Crew', bg: '#F3E8FF', color: '#9333EA' },
+  CLEANED_BY_FORCE: { label: 'Verification Needed', bg: '#D1FAE5', color: '#059669' },
+  COMPLETED: { label: 'Completed', bg: '#D1FAE5', color: '#059669' },
+  REJECTED: { label: 'Rejected', bg: '#F1F5F9', color: '#475569' },
+  ESCALATED: { label: 'Escalated', bg: '#FEE2E2', color: '#DC2626' },
 };
+
 const SBadge = ({ status }) => {
-  const m = STATUS_META[status] || { label:status, bg:'#eee', color:'#333' };
+  const m = STATUS_META[status] || { label: status, bg: '#F1F5F9', color: '#475569' };
   return (
-    <span style={{ background:m.bg, color:m.color, padding:'3px 9px', borderRadius:99, fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}>
+    <span style={{
+      background: m.bg, color: m.color, padding: '4px 10px', borderRadius: '6px',
+      fontSize: '11px', fontWeight: 600, display: 'inline-flex', alignItems: 'center'
+    }}>
       {m.label}
     </span>
   );
 };
 
-/* ── Task Card ── */
+/* ── Premium Crafted Task Card ── */
 function TaskCard({ c, onAction, onSelect, onOpenAssignModal, onViewImage, t }) {
   const img = getImg(c);
   const stationName = typeof c.station === 'object' ? c.station?.name : c.station;
 
   return (
-    <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:10, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+    <div style={{
+      background: t.surface, border: `1px solid ${t.border}`, borderRadius: '12px',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)',
+      transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+    }}>
       {img ? (
-        <div style={{ position:'relative', cursor:'zoom-in', flexShrink:0 }} onClick={() => onViewImage(img)}>
-          <img src={img} alt="Report" style={{ width:'100%', height:140, objectFit:'cover', display:'block' }} />
-          <div style={{ position:'absolute', top:8, right:8, background:'rgba(0,0,0,.55)', borderRadius:5, padding:'3px 7px', fontSize:10, color:'#fff', display:'flex', alignItems:'center', gap:4, pointerEvents:'none' }}>
-            <i className="ti ti-zoom-in" style={{ fontSize:11 }} aria-hidden="true" /> View Full
-          </div>
-          <div style={{ position:'absolute', top:8, left:8, pointerEvents:'none' }}>
-            <SBadge status={c.status} />
+        <div style={{ position: 'relative', cursor: 'zoom-in', height: '160px', overflow: 'hidden' }} onClick={() => onViewImage(img)}>
+          <img src={img} alt="Incident Track" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ position: 'absolute', top: '12px', left: '12px' }}><SBadge status={c.status} /></div>
+          <div style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(15, 23, 42, 0.75)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', color: '#fff', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <i className="ti ti-maximize" /> Maximize
           </div>
         </div>
       ) : (
-        <div style={{ height:60, background:t.surface2, display:'flex', alignItems:'center', justifyContent:'center', borderBottom:`1px solid ${t.border}` }}>
+        <div style={{ height: '70px', background: t.surface2, display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: `1px solid ${t.border}` }}>
           <SBadge status={c.status} />
         </div>
       )}
 
-      <div style={{ padding:'11px 13px', flex:1, display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div>
-          <div style={{ fontSize:10, color:t.text3, fontFamily:'IBM Plex Mono,monospace', marginBottom:2 }}>{c.customTicketId || c.id}</div>
-          <div style={{ fontSize:13, fontWeight:700, color:t.text, lineHeight:1.3 }}>{c.gtype || c.title || 'Waste Report'}</div>
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-          {stationName && <div style={{ fontSize:11, color:t.text3, display:'flex', alignItems:'center', gap:5 }}><i className="ti ti-building-store" style={{ fontSize:12 }} aria-hidden="true" />{stationName}</div>}
-          {c.area      && <div style={{ fontSize:11, color:t.text3, display:'flex', alignItems:'center', gap:5 }}><i className="ti ti-map-pin"        style={{ fontSize:12 }} aria-hidden="true" />{c.area}</div>}
-          {c.severity  && <div style={{ fontSize:11, color:t.text3, display:'flex', alignItems:'center', gap:5 }}><i className="ti ti-alert-triangle"  style={{ fontSize:12 }} aria-hidden="true" />Severity: <strong style={{ color:t.text2 }}>{c.severity}</strong></div>}
+          <span style={{ fontSize: '11px', color: t.text3, fontFamily: 'JetBrains Mono', fontWeight: 500 }}>
+            {c.customTicketId || c.id || 'N/A'}
+          </span>
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: t.text, margin: '4px 0 0', fontFamily: 'Plus Jakarta Sans' }}>
+            {c.gtype || c.title || 'General Maintenance'}
+          </h3>
         </div>
 
-        {/* Cleaner proof photo */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: t.surface2, padding: '10px', borderRadius: '8px' }}>
+          {stationName && <div style={{ fontSize: '12px', color: t.text2, display: 'flex', alignItems: 'center', gap: '6px' }}><i className="ti ti-train" style={{ color: t.accent }} /> {stationName}</div>}
+          {c.area && <div style={{ fontSize: '12px', color: t.text2, display: 'flex', alignItems: 'center', gap: '6px' }}><i className="ti ti-map-pin" style={{ color: t.accent }} /> {c.area}</div>}
+          {c.severity && <div style={{ fontSize: '12px', color: t.text2, display: 'flex', alignItems: 'center', gap: '6px' }}><i className="ti ti-alert-circle" style={{ color: c.severity.toLowerCase() === 'critical' ? t.red : t.amber }} /> Priority: <strong style={{ textTransform: 'capitalize' }}>{c.severity}</strong></div>}
+        </div>
+
         {c.status === 'CLEANED_BY_FORCE' && c.cleanerPhoto && (
-          <div style={{ background:t.greenLight, borderRadius:7, padding:8, border:`1px solid rgba(13,110,82,.2)` }}>
-            <div style={{ fontSize:10, fontWeight:700, color:t.green, marginBottom:6, textTransform:'uppercase', letterSpacing:'.05em' }}>Cleaner Proof Photo</div>
-            <div style={{ cursor:'zoom-in', borderRadius:5, overflow:'hidden' }} onClick={() => onViewImage(c.cleanerPhoto)}>
-              <img src={c.cleanerPhoto} alt="Proof" style={{ width:'100%', height:80, objectFit:'cover', display:'block' }} />
-            </div>
+          <div style={{ border: `1px solid ${t.green}33`, background: `${t.green}08`, borderRadius: '8px', padding: '10px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: t.green, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><i className="ti ti-camera" /> Crew Resolution Proof:</div>
+            <img src={c.cleanerPhoto} alt="Proof Node" style={{ width: '100%', height: '90px', objectFit: 'cover', borderRadius: '6px', cursor: 'zoom-in' }} onClick={() => onViewImage(c.cleanerPhoto)} />
           </div>
         )}
 
         {c.status === 'ASSIGNED_TO_CLEANER' && (
-          <div style={{ fontSize:11, color:t.amber, fontWeight:600, background:t.amberLight, padding:'6px 10px', borderRadius:5, display:'flex', alignItems:'center', gap:5 }}>
-            <i className="ti ti-user-check" style={{ fontSize:13 }} aria-hidden="true" />
-            On Duty: {c.assignedTo || 'Cleaner'}
+          <div style={{ fontSize: '12px', color: t.amber, fontWeight: 600, background: `${t.amber}10`, padding: '8px 12px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <i className="ti ti-user-check" /> Deployed: {c.assignedTo || 'Staff Operator'}
           </div>
         )}
 
-        <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:'auto' }}>
-          {c.status === 'NEW'              && <Btn t={t} onClick={e=>{e.stopPropagation();onAction(c.id,'ACCEPTED');}}            icon="ti-circle-check">Accept Task</Btn>}
-          {c.status === 'ACCEPTED'         && <Btn t={t} onClick={e=>{e.stopPropagation();onOpenAssignModal(c);}} color="#4527A0" icon="ti-user-plus">Assign Cleaner</Btn>}
-          {c.status === 'CLEANED_BY_FORCE' && <Btn t={t} onClick={e=>{e.stopPropagation();onAction(c.id,'COMPLETED');}}           color={t.green} icon="ti-check">Complete &amp; Close</Btn>}
-          <Btn t={t} onClick={e=>{e.stopPropagation();onSelect(c);}} outline small icon="ti-eye">View Details</Btn>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto', paddingTop: '8px' }}>
+          {c.status === 'NEW' && <Btn t={t} onClick={() => onAction(c.id, 'ACCEPTED')} color={t.accent} icon="ti-check">Accept Inspection</Btn>}
+          {c.status === 'ACCEPTED' && <Btn t={t} onClick={() => onOpenAssignModal(c)} color="#7C3AED" icon="ti-user-plus">Assign Field Crew</Btn>}
+          {c.status === 'CLEANED_BY_FORCE' && <Btn t={t} onClick={() => onAction(c.id, 'COMPLETED')} color={t.green} icon="ti-circle-check">Approve &amp; Close Task</Btn>}
+          <Btn t={t} onClick={() => onSelect(c)} outline small icon="ti-eye">View Audit Log</Btn>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Done Card ── */
-function DoneCard({ c, onSelect, onViewImage, t }) {
-  const img = getImg(c);
-  const stationName = typeof c.station === 'object' ? c.station?.name : c.station;
-  return (
-    <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:10, overflow:'hidden', cursor:'pointer' }} onClick={() => onSelect(c)}>
-      {img ? (
-        <div style={{ position:'relative' }} onClick={e=>{e.stopPropagation();onViewImage(img);}}>
-          <img src={img} alt="Report" style={{ width:'100%', height:120, objectFit:'cover', display:'block', cursor:'zoom-in' }} />
-          <div style={{ position:'absolute', top:8, right:8, background:'rgba(0,0,0,.55)', borderRadius:5, padding:'3px 7px', fontSize:10, color:'#fff', display:'flex', alignItems:'center', gap:4 }}>
-            <i className="ti ti-zoom-in" style={{ fontSize:11 }} aria-hidden="true" /> View
-          </div>
-        </div>
-      ) : (
-        <div style={{ height:48, background:t.surface2, borderBottom:`1px solid ${t.border}` }} />
-      )}
-      <div style={{ padding:'10px 12px' }}>
-        <div style={{ fontSize:10, color:t.text3, fontFamily:'IBM Plex Mono,monospace', marginBottom:2 }}>{c.customTicketId || c.id}</div>
-        <div style={{ fontSize:13, fontWeight:700, color:t.text, marginBottom:4 }}>{c.gtype || c.title || 'Waste Report'}</div>
-        <div style={{ fontSize:11, color:t.text3 }}>{c.area}{stationName ? ` · ${stationName}` : ''}</div>
-        {c.cleanerPhoto && (
-          <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:t.green, fontWeight:600, marginBottom:4 }}>After-clean photo:</div>
-            <img src={c.cleanerPhoto} alt="After" style={{ width:'100%', height:70, objectFit:'cover', borderRadius:5, cursor:'zoom-in', display:'block' }}
-              onClick={e=>{e.stopPropagation();onViewImage(c.cleanerPhoto);}} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ── Task Inbox ── */
+/* ── UI Tasks Box Dashboard ── */
 function TaskInbox({ tasks, onAction, onSelect, onOpenAssignModal, onViewImage, t }) {
-  const active = tasks.filter(c => !['COMPLETED','REJECTED'].includes(c.status));
-  const stats  = [
-    { label:'Total',  value:tasks.length,                                                                             color:t.text   },
-    { label:'New',    value:tasks.filter(c=>c.status==='NEW').length,                                                 color:t.red    },
-    { label:'Active', value:tasks.filter(c=>['ACCEPTED','ASSIGNED_TO_CLEANER','CLEANED_BY_FORCE'].includes(c.status)).length, color:t.accent },
-    { label:'Done',   value:tasks.filter(c=>c.status==='COMPLETED').length,                                           color:t.green  },
+  const active = tasks.filter(c => !['COMPLETED', 'REJECTED'].includes(c.status));
+  const stats = [
+    { label: 'Total Node Tracks', value: tasks.length, color: t.text, icon: 'ti-folders' },
+    { label: 'Unassigned New', value: tasks.filter(c => c.status === 'NEW').length, color: t.red, icon: 'ti-bell-ringing' },
+    { label: 'In Progress Ops', value: tasks.filter(c => ['ACCEPTED', 'ASSIGNED_TO_CLEANER', 'CLEANED_BY_FORCE'].includes(c.status)).length, color: t.accent, icon: 'ti-adjustments' },
+    { label: 'Resolved Node', value: tasks.filter(c => c.status === 'COMPLETED').length, color: t.green, icon: 'ti-circle-check' },
   ];
+
   return (
     <>
-      <div style={{ marginBottom:20 }}>
-        <div style={{ fontSize:17, fontWeight:700, color:t.text, letterSpacing:'-.01em' }}>Tasks Workspace</div>
-        <div style={{ fontSize:11, color:t.text3, marginTop:2, fontFamily:'IBM Plex Mono,monospace' }}>Nagpur Junction — Live Nodes</div>
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 700, color: t.text, margin: 0, fontFamily: 'Plus Jakarta Sans' }}>Analytics &amp; Operational Logs</h2>
+        <p style={{ fontSize: '12px', color: t.text3, margin: '4px 0 0' }}>Real-time spatial verification updates</p>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:8, marginBottom:16 }}>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {stats.map(k => (
-          <div key={k.label} style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:7, padding:'10px 14px', textAlign:'center' }}>
-            <div style={{ fontSize:22, fontWeight:700, color:k.color, fontFamily:'IBM Plex Mono,monospace', lineHeight:1 }}>{k.value}</div>
-            <div style={{ fontSize:10, color:t.text3, marginTop:4, textTransform:'uppercase', letterSpacing:'.06em', fontWeight:600 }}>{k.label}</div>
+          <div key={k.label} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '26px', fontWeight: 700, color: k.color, fontFamily: 'JetBrains Mono', lineHeight: 1 }}>{k.value}</div>
+              <div style={{ fontSize: '11px', color: t.text3, marginTop: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.03em' }}>{k.label}</div>
+            </div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: `${k.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color }}>
+              <i className={`ti ${k.icon}`} style={{ fontSize: '20px' }} />
+            </div>
           </div>
         ))}
       </div>
+
       {active.length === 0 ? (
-        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:8, padding:32, textAlign:'center', color:t.text3 }}>
-          <i className="ti ti-circle-check" style={{ fontSize:28, display:'block', marginBottom:8, color:t.green }} aria-hidden="true" />
-          No pending cleaning tracks available.
+        <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '48px', textAlign: 'center' }}>
+          <i className="ti ti-shield-check" style={{ fontSize: '44px', color: t.green, display: 'block', marginBottom: '12px' }} />
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: t.text, margin: 0 }}>All Tracks Cleaned</h3>
+          <p style={{ fontSize: '13px', color: t.text3, marginTop: '4px' }}>No pending active alerts recorded for your station area boundary.</p>
         </div>
       ) : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '20px' }}>
           {active.map(c => (
             <TaskCard key={c.id} c={c} onAction={onAction} onSelect={onSelect} onOpenAssignModal={onOpenAssignModal} onViewImage={onViewImage} t={t} />
           ))}
@@ -318,57 +289,59 @@ function TaskInbox({ tasks, onAction, onSelect, onOpenAssignModal, onViewImage, 
   );
 }
 
-/* ── Cleaner Staff Management ── */
+/* ── Dynamic Cleaner Crew Section ── */
 function DynamicCleanersTab({ cleaners, onAddCleaner, onDeleteCleaner, t }) {
-  const [cName,     setCName]     = useState('');
-  const [cPhone,    setCPhone]    = useState('');
+  const [cName, setCName] = useState('');
+  const [cPhone, setCPhone] = useState('');
   const [cPassword, setCPassword] = useState('');
-  const [showPassId,setShowPassId]= useState(null);
+  const [showPassId, setShowPassId] = useState(null);
 
   const handleSubmit = e => {
     e.preventDefault();
-    if (!cName.trim() || !cPhone.trim() || !cPassword.trim()) return alert('Please fill all fields.');
-    onAddCleaner({ name:cName.trim(), phone:cPhone.trim(), password:cPassword.trim() });
+    if (!cName.trim() || !cPhone.trim() || !cPassword.trim()) return alert('Complete credential sequence fields.');
+    onAddCleaner({ name: cName.trim(), phone: cPhone.trim(), password: cPassword.trim() });
     setCName(''); setCPhone(''); setCPassword('');
   };
 
-  const inp = { width:'100%', padding:'8px 10px', fontSize:12, borderRadius:5, border:`1px solid ${t.border}`, boxSizing:'border-box', fontFamily:'IBM Plex Sans,sans-serif', background:t.surface2, color:t.text, outline:'none' };
-  const lbl = { fontSize:10, fontWeight:600, color:t.text3, display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:'.06em', fontFamily:'IBM Plex Mono,monospace' };
+  const inp = { width: '100%', padding: '10px 14px', fontSize: '13px', borderRadius: '8px', border: `1px solid ${t.border}`, boxSizing: 'border-box', fontFamily: 'Plus Jakarta Sans', background: t.surface2, color: t.text, outline: 'none', transition: 'border 0.2s' };
+  const lbl = { fontSize: '11px', fontWeight: 600, color: t.text2, display: 'block', marginBottom: '6px', fontFamily: 'JetBrains Mono' };
 
   return (
     <>
-      <div style={{ marginBottom:20 }}>
-        <div style={{ fontSize:17, fontWeight:700, color:t.text, letterSpacing:'-.01em' }}>Cleaner Staff</div>
-        <div style={{ fontSize:11, color:t.text3, marginTop:2 }}>Manage ground deployment crews</div>
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 700, color: t.text, margin: 0 }}>Ground Operations Crew</h2>
+        <p style={{ fontSize: '12px', color: t.text3, margin: '4px 0 0' }}>Manage credentials and dynamic deployment authentications</p>
       </div>
-      <form onSubmit={handleSubmit} style={{ display:'flex', flexWrap:'wrap', gap:10, background:t.surface, padding:14, borderRadius:8, border:`1px solid ${t.border}`, marginBottom:18, alignItems:'flex-end' }}>
-        <div style={{ flex:1, minWidth:140 }}><span style={lbl}>Cleaner Name</span><input type="text" value={cName} onChange={e=>setCName(e.target.value)} placeholder="e.g. Ramesh Kumar" style={inp} /></div>
-        <div style={{ flex:1, minWidth:140 }}><span style={lbl}>Phone / Login ID</span><input type="text" value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="e.g. ramesh98" style={inp} /></div>
-        <div style={{ flex:1, minWidth:110 }}><span style={lbl}>Password</span><input type="password" value={cPassword} onChange={e=>setCPassword(e.target.value)} placeholder="••••••" style={inp} /></div>
-        <Btn t={t} type="submit" color={t.green} icon="ti-user-plus">Add Cleaner</Btn>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', background: t.surface, padding: '20px', borderRadius: '12px', border: `1px solid ${t.border}`, marginBottom: '24px', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1, minWidth: '200px' }}><span style={lbl}>Crew Name</span><input type="text" value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g., Sunil Verma" style={inp} /></div>
+        <div style={{ flex: 1, minWidth: '200px' }}><span style={lbl}>Phone / Operator ID</span><input type="text" value={cPhone} onChange={e => setCPhone(e.target.value)} placeholder="e.g., sunil99" style={inp} /></div>
+        <div style={{ flex: 1, minWidth: '180px' }}><span style={lbl}>Security Key</span><input type="password" value={cPassword} onChange={e => setCPassword(e.target.value)} placeholder="••••••••" style={inp} /></div>
+        <Btn t={t} type="submit" color={t.green} icon="ti-user-plus" style={{ height: '42px' }}>Onboard Member</Btn>
       </form>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:12 }}>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
         {cleaners.length === 0 ? (
-          <div style={{ color:t.text3, fontSize:12 }}>No staff onboarded yet.</div>
+          <div style={{ color: t.text3, fontSize: '13px', padding: '16px', background: t.surface, borderRadius: '8px', border: `1px solid ${t.border}` }}>No field staff currently configured.</div>
         ) : cleaners.map(c => (
-          <div key={c.id} style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:8, padding:14, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div>
-              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
-                <div style={{ width:30, height:30, borderRadius:5, background:t.accentLight, color:t.accent, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:11, fontFamily:'IBM Plex Mono,monospace' }}>
-                  {c.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
-                </div>
-                <div style={{ fontWeight:600, fontSize:13, color:t.text }}>{c.name}</div>
+          <div key={c.id} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 4px rgba(0,0,0,0.01)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: t.accentLight, color: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', fontFamily: 'JetBrains Mono' }}>
+                {c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
               </div>
-              <div style={{ fontSize:10, color:t.text3, fontFamily:'IBM Plex Mono,monospace' }}>ID: <strong style={{ color:t.accent }}>{c.phone}</strong></div>
-              <div style={{ fontSize:10, color:t.text3, marginTop:2, fontFamily:'IBM Plex Mono,monospace' }}>
-                Pass: <strong>{showPassId === c.id ? c.password : '••••••'}</strong>
-                <span onClick={()=>setShowPassId(showPassId===c.id?null:c.id)} style={{ marginLeft:5, color:t.accent, cursor:'pointer', fontSize:9, textTransform:'uppercase', letterSpacing:'.04em' }}>
-                  [{showPassId === c.id ? 'Hide' : 'Show'}]
-                </span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: t.text }}>{c.name}</div>
+                <div style={{ fontSize: '11px', color: t.text3, fontFamily: 'JetBrains Mono', marginTop: '2px' }}>ID: <span style={{ color: t.accent, fontWeight: 600 }}>{c.phone}</span></div>
+                <div style={{ fontSize: '11px', color: t.text3, fontFamily: 'JetBrains Mono' }}>
+                  Pass: <span>{showPassId === c.id ? c.password : '••••••••'}</span>
+                  <button onClick={() => setShowPassId(showPassId === c.id ? null : c.id)} style={{ marginLeft: '6px', background: 'none', border: 'none', color: t.accent, cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>
+                    {showPassId === c.id ? '[Hide]' : '[Reveal]'}
+                  </button>
+                </div>
               </div>
             </div>
-            <button onClick={()=>onDeleteCleaner(c.id)} style={{ background:t.redLight, border:`1px solid rgba(163,45,45,.2)`, color:t.red, cursor:'pointer', width:32, height:32, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center' }} aria-label={`Remove ${c.name}`}>
-              <i className="ti ti-trash" style={{ fontSize:14 }} aria-hidden="true" />
+            <button onClick={() => onDeleteCleaner(c.id)} style={{ background: `${t.red}10`, border: 'none', color: t.red, cursor: 'pointer', width: '36px', height: '36px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }} aria-label="Revoke Crew Access">
+              <i className="ti ti-trash" style={{ fontSize: '16px' }} />
             </button>
           </div>
         ))}
@@ -378,7 +351,7 @@ function DynamicCleanersTab({ cleaners, onAddCleaner, onDeleteCleaner, t }) {
 }
 
 /* ════════════════════════════════════════
-   MAIN VENDOR PORTAL
+    CORE BOOTSTRAP EXPORT LOGIC
 ════════════════════════════════════════ */
 export default function VendorPortal() {
   const { complaints, updateComplaint } = useApp();
@@ -386,18 +359,19 @@ export default function VendorPortal() {
   const [dark, setDark] = useState(false);
   const t = dark ? DARK : LIGHT;
 
-  const [isAuthenticated, setIsAuthenticated]     = useState(false);
-  const [vendorLoginId,   setVendorLoginId]       = useState('');
-  const [vendorPassword,  setVendorPassword]      = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [vendorLoginId, setVendorLoginId] = useState('');
+  const [vendorPassword, setVendorPassword] = useState('');
   const [currentVendorData, setCurrentVendorData] = useState(null);
 
-  const [tab,               setTab]              = useState('tasks');
-  const [selected,          setSelected]         = useState(null);
-  const [notif,             setNotif]            = useState(null);
-  const [assignModalTask,   setAssignModalTask]  = useState(null);
-  const [lightboxImage,     setLightboxImage]    = useState(null);
-  const [cleaners,          setCleaners]         = useState([]);
-  const [sidebarOpen,       setSidebarOpen]      = useState(false);
+  const [tab, setTab] = useState('tasks');
+  const [selected, setSelected] = useState(null);
+  const [notif, setNotif] = useState(null);
+  const [assignModalTask, setAssignModalTask] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null);
+  const [cleaners, setCleaners] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [vendorComplaints, setVendorComplaints] = useState([]);
 
   const handleTabChange = useCallback(newTab => {
     setTab(newTab);
@@ -408,45 +382,56 @@ export default function VendorPortal() {
     if (!isAuthenticated || !vendorLoginId) return;
     return onSnapshot(
       collection(db, 'vendors', vendorLoginId.trim(), 'cleaners'),
-      snap => setCleaners(snap.docs.map(d => ({ id:d.id, ...d.data() })))
+      snap => setCleaners(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
   }, [isAuthenticated, vendorLoginId]);
 
+  useEffect(() => {
+    if (!currentVendorData) return;
+    const q = query(
+      collection(db, 'complaints'),
+      where('area', '==', currentVendorData.areaName || '')
+    );
+    return onSnapshot(q, snap => {
+      setVendorComplaints(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, [currentVendorData]);
+
   const handleVendorAuth = async e => {
     e.preventDefault();
-    if (!vendorLoginId.trim() || !vendorPassword) return alert('Fill all fields.');
+    if (!vendorLoginId.trim() || !vendorPassword) return alert('Input credentials.');
     try {
       const res = await getDoc(doc(db, 'vendors', vendorLoginId.trim()));
       if (res.exists() && res.data().password === vendorPassword) {
-        setCurrentVendorData(res.data());
+        setCurrentVendorData({ id: res.id, ...res.data() });
         setIsAuthenticated(true);
       } else {
-        alert('Invalid Vendor Credentials.');
+        alert('Invalid Secure Node Token matching parameters.');
       }
-    } catch { alert('Database connection error.'); }
+    } catch { alert('Database network synchronization failure.'); }
   };
 
   const handleAddCleaner = async payload => {
     try {
-      await setDoc(doc(collection(db, 'vendors', vendorLoginId.trim(), 'cleaners')), { ...payload, createdAt:serverTimestamp() });
-      setNotif(`${payload.name} added to staff.`);
-    } catch { alert('Failed to add cleaner.'); }
+      await setDoc(doc(collection(db, 'vendors', vendorLoginId.trim(), 'cleaners')), { ...payload, createdAt: serverTimestamp() });
+      setNotif(`Crew member ${payload.name} deployed onto active matrix.`);
+    } catch { alert('Write verification failure.'); }
   };
 
   const handleDeleteCleaner = async id => {
-    if (!window.confirm('Remove this staff member?')) return;
+    if (!window.confirm('Revoke access clearance for this token node?')) return;
     try {
       await deleteDoc(doc(db, 'vendors', vendorLoginId.trim(), 'cleaners', id));
-      setNotif('Staff removed.');
-    } catch { alert('Error removing staff.'); }
+      setNotif('Operator wiped from terminal.');
+    } catch { alert('Mutation failure.'); }
   };
 
   const act = async (id, status) => {
     await updateComplaint(id, status === 'COMPLETED'
-      ? { status, cleanerStatus:'DONE', resolvedAt:new Date() }
+      ? { status, cleanerStatus: 'DONE', resolvedAt: new Date() }
       : { status }
     );
-    setNotif('Status updated.');
+    setNotif('Spatial node status committed.');
   };
 
   const handleAssignCleaner = async cleanerName => {
@@ -456,7 +441,7 @@ export default function VendorPortal() {
       assignedTo: cleanerName,
       cleanerStatus: 'ASSIGNED',
     });
-    setNotif(`Assigned to ${cleanerName}`);
+    setNotif(`Task routed to crew asset [${cleanerName}]`);
     setAssignModalTask(null);
   };
 
@@ -467,235 +452,126 @@ export default function VendorPortal() {
     setVendorPassword('');
   };
 
-  /* filter complaints to this vendor's station */
-  const filteredComplaints = currentVendorData?.stationName
-    ? complaints.filter(c => {
-        const sName = typeof c.station === 'object' ? c.station?.name : c.station;
-        return sName === currentVendorData.stationName;
-      })
-    : complaints;
+  const combinedComplaints = vendorComplaints.length > 0 ? vendorComplaints : complaints;
+  const filteredComplaints = combinedComplaints.filter(c => {
+    if (!c || !currentVendorData) return false;
+    const idMatch = c.vendorId === currentVendorData.id;
+    const complaintArea = String(c.area || '').trim().toLowerCase();
+    const vendorArea = String(currentVendorData.areaName || '').trim().toLowerCase();
+    return idMatch || (complaintArea !== '' && complaintArea === vendorArea);
+  });
 
-  /* ── Responsive CSS ── */
   const css = `
     ${FONTS}
     * { box-sizing: border-box; }
-    .vp-hamburger { display: none !important; }
-    .vp-sidebar-overlay { display: none; }
-    .vp-sidebar { height: 100%; }
+    body { margin: 0; background: ${t.bg}; font-family: 'Plus Jakarta Sans', sans-serif; }
     @media (max-width: 768px) {
       .vp-hamburger { display: flex !important; }
-      .vp-hide-xs  { display: none !important; }
+      .vp-hide-xs { display: none !important; }
       .vp-sidebar {
-        position: fixed !important;
-        left: 0; top: 0; bottom: 0;
-        height: 100% !important;
-        z-index: 1000;
-        transform: translateX(-100%);
-        transition: transform .25s ease;
-        box-shadow: 4px 0 24px rgba(0,0,0,.3);
+        position: fixed !important; left: 0; top: 0; bottom: 0; z-index: 1000;
+        transform: translateX(-100%); transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 10px 0 30px rgba(0,0,0,0.15);
       }
       .vp-sidebar.open { transform: translateX(0) !important; }
-      .vp-sidebar-overlay {
-        display: block;
-        position: fixed; inset: 0;
-        background: rgba(0,0,0,.45);
-        z-index: 999;
-      }
+      .vp-sidebar-overlay { position: fixed; inset: 0; background: rgba(2,6,23,0.4); z-index: 999; backdrop-filter: blur(4px); }
     }
   `;
 
-  /* ══════════════════════════════════════
-     LOGIN SCREEN
-  ══════════════════════════════════════ */
   if (!isAuthenticated) {
     return (
-      <div style={{ display:'flex', minHeight:'100vh', flexDirection:'column', background: dark ? '#030810' : '#F0F1F3', fontFamily:'IBM Plex Sans,sans-serif' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column', background: dark ? '#020617' : '#F8FAFC', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
         <style>{css}</style>
-
-        {/* header */}
-        <div style={{ background:'#1C3D8F', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52, flexShrink:0, borderBottom:'1px solid rgba(0,0,0,0.15)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:32, height:32, borderRadius:5, background:'rgba(255,255,255,0.12)', border:'1px solid rgba(255,255,255,0.18)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
-              <img src="/logo.jpeg" alt="Logo" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+        <div style={{ background: '#1C3D8F', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/logo.jpeg" alt="Logo" style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
             </div>
             <div>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff', letterSpacing:'-.01em', lineHeight:1 }}>Railway Material Management System</div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontFamily:'IBM Plex Mono,monospace', letterSpacing:'.05em', marginTop:2 }}>CENTRAL RAILWAY · NAGPUR DIVISION</div>
+              <h1 style={{ fontSize: '14px', fontWeight: 700, color: '#fff', margin: 0 }}>Rail Cleanliness Monitoring Ecosystem</h1>
+              <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', fontFamily: 'JetBrains Mono', margin: 0 }}>CENTRAL RAILWAY · DIVISION WORKSPACE</p>
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <button onClick={()=>setDark(v=>!v)}
-              style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:5, padding:'5px 9px', cursor:'pointer', display:'flex', alignItems:'center', gap:5, color:'rgba(255,255,255,0.8)', fontSize:10, fontWeight:600, fontFamily:'IBM Plex Sans,sans-serif' }}
-              aria-label="Toggle theme">
-              <i className={`ti ${dark?'ti-sun':'ti-moon'}`} style={{ fontSize:14 }} aria-hidden="true" />
-              <span className="vp-hide-xs">{dark?'Light':'Dark'}</span>
-            </button>
-            <div style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:5, padding:'5px 11px', color:'rgba(255,255,255,0.85)', fontSize:10, fontWeight:700, fontFamily:'IBM Plex Sans,sans-serif', letterSpacing:'.04em', textTransform:'uppercase' }}>
-              VENDOR PORTAL
-            </div>
-          </div>
+          <button onClick={() => setDark(!dark)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '36px', height: '36px', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
+            <i className={`ti ${dark ? 'ti-sun' : 'ti-moon'}`} style={{ fontSize: '16px' }} />
+          </button>
         </div>
 
-        {/* login card */}
-        <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px 16px' }}>
-          <div style={{ background:t.surface, padding:'28px 24px', borderRadius:10, width:'min(360px, 100%)', border:`1px solid ${t.border}`, boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20, paddingBottom:16, borderBottom:`1px solid ${t.border}` }}>
-              <div style={{ width:48, height:48, borderRadius:8, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', background:t.surface2, border:`1px solid ${t.border}`, flexShrink:0 }}>
-                <img src="/logo.jpeg" alt="Logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: t.surface, padding: '32px', borderRadius: '16px', width: '100%', maxWidth: '400px', border: `1px solid ${t.border}`, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: t.text, margin: '0 0 6px 0' }}>Terminal Authentication</h2>
+            <p style={{ fontSize: '13px', color: t.text3, margin: '0 0 24px 0' }}>Provide security credentials to check status</p>
+            <form onSubmit={handleVendorAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: t.text2, fontFamily: 'JetBrains Mono', display: 'block', marginBottom: '6px' }}>Vendor Secure Token ID</label>
+                <input type="text" value={vendorLoginId} onChange={e => setVendorLoginId(e.target.value)} placeholder="Terminal Code Node" style={{ width: '100%', padding: '12px', fontSize: '14px', borderRadius: '8px', border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: 'none' }} required />
               </div>
               <div>
-                <div style={{ fontSize:15, fontWeight:700, color:t.text, lineHeight:1.2 }}>Vendor Login</div>
-                <div style={{ fontSize:10, color:t.text3, fontFamily:'IBM Plex Mono,monospace', marginTop:3, letterSpacing:'.04em' }}>NAGPUR JUNCTION · CENTRAL RAILWAY</div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: t.text2, fontFamily: 'JetBrains Mono', display: 'block', marginBottom: '6px' }}>Secret Passkey</label>
+                <input type="password" value={vendorPassword} onChange={e => setVendorPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', padding: '12px', fontSize: '14px', borderRadius: '8px', border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: 'none' }} required />
               </div>
-            </div>
-
-            <form onSubmit={handleVendorAuth}>
-              <label style={{ display:'block', fontSize:10, fontWeight:600, color:t.text3, marginBottom:5, textTransform:'uppercase', letterSpacing:'.07em', fontFamily:'IBM Plex Mono,monospace' }}>Vendor Station ID</label>
-              <input type="text" value={vendorLoginId} onChange={e=>setVendorLoginId(e.target.value)} placeholder="e.g. platform_no_1"
-                style={{ width:'100%', padding:'10px 12px', borderRadius:6, border:`1px solid ${t.border}`, marginBottom:14, fontSize:13, fontFamily:'IBM Plex Sans,sans-serif', background:t.surface2, color:t.text, outline:'none' }} required />
-              <label style={{ display:'block', fontSize:10, fontWeight:600, color:t.text3, marginBottom:5, textTransform:'uppercase', letterSpacing:'.07em', fontFamily:'IBM Plex Mono,monospace' }}>Access Password</label>
-              <input type="password" value={vendorPassword} onChange={e=>setVendorPassword(e.target.value)} placeholder="••••••••"
-                style={{ width:'100%', padding:'10px 12px', borderRadius:6, border:`1px solid ${t.border}`, marginBottom:20, fontSize:13, fontFamily:'IBM Plex Sans,sans-serif', background:t.surface2, color:t.text, outline:'none' }} required />
-              <button type="submit" style={{ width:'100%', padding:11, background:'#1C3D8F', color:'#fff', border:'none', borderRadius:6, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:7, letterSpacing:'.01em' }}>
-                <i className="ti ti-login" style={{ fontSize:16 }} aria-hidden="true" />
-                Authenticate Vendor
-              </button>
+              <Btn t={t} type="submit" color={t.accent} icon="ti-login" style={{ width: '100%', marginTop: '8px', height: '46px' }}>Verify Identity</Btn>
             </form>
-
-            <div style={{ marginTop:14, padding:'9px 12px', background:t.surface2, borderRadius:6, border:`1px solid ${t.border}`, display:'flex', alignItems:'flex-start', gap:8 }}>
-              <i className="ti ti-info-circle" style={{ fontSize:14, color:t.accent, flexShrink:0, marginTop:1 }} aria-hidden="true" />
-              <div style={{ fontSize:11, color:t.text3, lineHeight:1.5 }}>Credentials are issued by your department supervisor. Contact them if you need access.</div>
-            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  /* ══════════════════════════════════════
-     VENDOR CONTROL CENTER
-  ══════════════════════════════════════ */
-  const navItems = [
-    { key:'tasks',   label:'Tasks Inbox', count: filteredComplaints.filter(c=>['NEW','ACCEPTED','ASSIGNED_TO_CLEANER','CLEANED_BY_FORCE'].includes(c.status)).length },
-    { key:'map',     label:'GIS Map'     },
-    { key:'cleaners',label:'Cleaners'    },
-    { key:'done',    label:'Completed'   },
-  ];
-
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100vh', fontFamily:'IBM Plex Sans,sans-serif', background:t.bg, overflow:'hidden' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column', background: t.bg, color: t.text }}>
       <style>{css}</style>
+      <TopHeader t={t} dark={dark} onToggleDark={() => setDark(!dark)} vendorData={currentVendorData} onLogout={handleLogout} onHamburger={() => setSidebarOpen(true)} />
 
-      <TopHeader t={t} dark={dark} onToggleDark={()=>setDark(v=>!v)} vendorData={currentVendorData} onLogout={handleLogout} onHamburger={()=>setSidebarOpen(v=>!v)} />
+      {notif && <NotifBanner message={notif} onClose={() => setNotif(null)} t={t} />}
 
-      <div style={{ display:'flex', flex:1, minHeight:0, overflow:'hidden', position:'relative' }}>
-        {/* overlay */}
-        {sidebarOpen && <div className="vp-sidebar-overlay" onClick={()=>setSidebarOpen(false)} />}
+      <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
+        {sidebarOpen && <div className="vp-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
-        {/* sidebar wrapper — fixed 260px, never stretches */}
-        <div
-          className={`vp-sidebar${sidebarOpen?' open':''}`}
-          style={{ flexShrink:0, width:260, height:'100%', display:'flex', flexDirection:'column', background:t.sidebarBg, borderRight:`1px solid ${t.border}` }}
-        >
-          <Sidebar
-            title="Vendor Portal"
-            subtitle={currentVendorData?.name || 'Vendor Control'}
-            navItems={navItems}
-            activeTab={tab}
-            onTabChange={handleTabChange}
-            t={t}
-            dark={dark}
-            onToggleDark={()=>setDark(v=>!v)}
-            footerUser={{
-              initials: (currentVendorData?.name || 'VA').slice(0,2).toUpperCase(),
-              name:     currentVendorData?.name || 'Vendor Admin',
-              role:     currentVendorData?.stationName || 'Platform Head',
-              avatarColor: t.accent,
-            }}
-          />
-        </div>
+        <nav className={`vp-sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: '240px', background: t.sidebarBg, borderRight: `1px solid ${t.border}`, flexShrink: 0, display: 'flex', flexDirection: 'column', padding: '24px 16px', gap: '8px' }}>
+          <button onClick={() => handleTabChange('tasks')} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', background: tab === 'tasks' ? t.accentLight : 'transparent', color: tab === 'tasks' ? t.accent : t.text2, border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
+            <i className="ti ti-activity" style={{ fontSize: '18px' }} /> Tracking Monitor
+          </button>
+          <button onClick={() => handleTabChange('staff')} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', background: tab === 'staff' ? t.accentLight : 'transparent', color: tab === 'staff' ? t.accent : t.text2, border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
+            <i className="ti ti-users-group" style={{ fontSize: '18px' }} /> Ground Staff Crew
+          </button>
+        </nav>
 
-        {/* main content */}
-        <div style={{ flex:1, overflowY:'auto', background:t.bg }}>
-          {notif && <NotifBanner msg={notif} type="green" onDone={()=>setNotif(null)} />}
-          <div style={{ padding:20, maxWidth:880, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
-
-            {tab === 'tasks' && (
-              <TaskInbox tasks={filteredComplaints} onAction={act} onSelect={setSelected} onOpenAssignModal={setAssignModalTask} onViewImage={setLightboxImage} t={t} />
-            )}
-
-            {tab === 'map' && (
-              <>
-                <div style={{ marginBottom:16 }}>
-                  <div style={{ fontSize:17, fontWeight:700, color:t.text, letterSpacing:'-.01em' }}>GIS Live Map</div>
-                  <div style={{ fontSize:11, color:t.text3, marginTop:2 }}>Active complaint pins for your station</div>
-                </div>
-                <LiveMap complaints={filteredComplaints.filter(c=>c.lat&&c.lng)} height="400px" onPinClick={setSelected} />
-              </>
-            )}
-
-            {tab === 'cleaners' && (
-              <DynamicCleanersTab cleaners={cleaners} onAddCleaner={handleAddCleaner} onDeleteCleaner={handleDeleteCleaner} t={t} />
-            )}
-
-            {tab === 'done' && (
-              <>
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:17, fontWeight:700, color:t.text, letterSpacing:'-.01em' }}>Completed Logs</div>
-                  <div style={{ fontSize:11, color:t.text3, marginTop:2 }}>{filteredComplaints.filter(c=>c.status==='COMPLETED').length} resolved tasks</div>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:12 }}>
-                  {filteredComplaints.filter(c=>c.status==='COMPLETED').map(c => (
-                    <DoneCard key={c.id} c={c} onSelect={setSelected} onViewImage={setLightboxImage} t={t} />
-                  ))}
-                </div>
-              </>
-            )}
-
-          </div>
-        </div>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+          {tab === 'tasks' ? (
+            <TaskInbox tasks={filteredComplaints} onAction={act} onSelect={setSelected} onOpenAssignModal={setAssignModalTask} onViewImage={setLightboxImage} t={t} />
+          ) : (
+            <DynamicCleanersTab cleaners={cleaners} onAddCleaner={handleAddCleaner} onDeleteCleaner={handleDeleteCleaner} t={t} />
+          )}
+        </main>
       </div>
 
-      {/* ── Assign Cleaner Modal ── */}
+      {selected && <VendorComplaintModal complaint={selected} onClose={() => setSelected(null)} t={t} />}
+
       {assignModalTask && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'0 16px' }}>
-          <div style={{ background:t.surface, padding:18, borderRadius:10, width:'min(270px,100%)', border:`1px solid ${t.border}` }}>
-            <div style={{ fontWeight:700, fontSize:13, marginBottom:12, color:t.text, display:'flex', alignItems:'center', gap:7 }}>
-              <i className="ti ti-user-plus" style={{ fontSize:16, color:t.accent }} aria-hidden="true" />
-              Select Cleaning Crew
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:7, maxHeight:200, overflowY:'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(2, 6, 23, 0.4)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setAssignModalTask(null)}>
+          <div style={{ background: t.surface, padding: '24px', borderRadius: '12px', width: '100%', maxWidth: '420px', border: `1px solid ${t.border}`, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px', color: t.text }}>Select Deployment Crew Asset</h3>
+            <p style={{ fontSize: '13px', color: t.text3, marginBottom: '16px' }}>Route this track ticket to an on-duty node</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto', marginBottom: '20px' }}>
               {cleaners.length === 0 ? (
-                <div style={{ fontSize:12, color:t.text3, textAlign:'center', padding:10 }}>No cleaners available. Go to Cleaners tab.</div>
+                <p style={{ fontSize: '13px', color: t.text3, padding: '12px', background: t.surface2, borderRadius: '6px' }}>No workers mapped. Initialize staff setup under the Ground Staff tab.</p>
               ) : cleaners.map(c => (
-                <button key={c.id} onClick={()=>handleAssignCleaner(c.name)}
-                  style={{ padding:'9px 12px', background:t.surface2, border:`1px solid ${t.border}`, borderRadius:6, cursor:'pointer', textAlign:'left', fontWeight:600, fontSize:12, display:'flex', alignItems:'center', gap:7, fontFamily:'inherit', color:t.text }}>
-                  <div style={{ width:26, height:26, borderRadius:4, background:t.accentLight, color:t.accent, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, fontFamily:'IBM Plex Mono,monospace' }}>
-                    {c.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                <button key={c.id} onClick={() => handleAssignCleaner(c.name)} style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: '8px', padding: '12px', textAlign: 'left', cursor: 'pointer', color: t.text, display: 'flex', alignItems: 'center', gap: '10px', transition: 'background 0.2s' }}>
+                  <i className="ti ti-user-bolt" style={{ color: t.accent, fontSize: '16px' }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.name}</div>
+                    <div style={{ fontSize: '11px', color: t.text3, fontFamily: 'JetBrains Mono' }}>ID: {c.phone}</div>
                   </div>
-                  {c.name}
                 </button>
               ))}
             </div>
-            <button onClick={()=>setAssignModalTask(null)} style={{ marginTop:11, width:'100%', padding:7, background:t.surface3, border:`1px solid ${t.border}`, borderRadius:5, fontWeight:600, cursor:'pointer', fontSize:11, fontFamily:'inherit', color:t.text2 }}>
-              Cancel
-            </button>
+            <Btn t={t} outline onClick={() => setAssignModalTask(null)} style={{ width: '100%' }}>Abort Routing</Btn>
           </div>
         </div>
       )}
 
-      {/* ── Complaint Detail Modal ── */}
-      {selected && (
-        <VendorComplaintModal
-          complaint={complaints.find(c=>c.id===selected?.id) || selected}
-          onClose={()=>setSelected(null)}
-          onAction={(id,s)=>act(id,s)}
-          onViewImage={setLightboxImage}
-        />
-      )}
-
-      {/* ── Image Lightbox ── */}
-      <ImageLightbox imageUrl={lightboxImage} onClose={()=>setLightboxImage(null)} />
+      <ImageLightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />
     </div>
   );
 }
