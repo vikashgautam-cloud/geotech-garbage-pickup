@@ -183,12 +183,10 @@ const SBadge = ({ status }) => {
     </span>
   );
 };
-
 /* ── Task Card ── */
 function TaskCard({ c, onAction, onSelect, onOpenAssignModal, onViewImage, t }) {
   const img = getImg(c);
   const stationName = typeof c.station === 'object' ? c.station?.name : c.station;
-
   return (
     <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:10, overflow:'hidden', display:'flex', flexDirection:'column' }}>
       {img ? (
@@ -438,12 +436,28 @@ export default function VendorPortal() {
     } catch { alert('Database connection error.'); }
   };
 
-  const handleAddCleaner = async payload => {
-    try {
-      await setDoc(doc(collection(db, 'vendors', vendorLoginId.trim(), 'cleaners')), { ...payload, createdAt:serverTimestamp() });
-      setNotif(`${payload.name} added to staff.`);
-    } catch { alert('Failed to add cleaner.'); }
-  };
+const handleAddCleaner = async (payload) => {
+  try {
+    const enrichedPayload = {
+      ...payload,
+      stationName : currentVendorData?.stationName  || '',
+      areaName    : currentVendorData?.areaName     || '',
+      platformNo  : currentVendorData?.platformNo   || '',
+      vendorId    : vendorLoginId.trim(),
+      createdAt   : serverTimestamp(),
+    };
+
+    await setDoc(
+      doc(collection(db, 'vendors', vendorLoginId.trim(), 'cleaners')),
+      enrichedPayload
+    );
+
+    setNotif(`${payload.name} added to staff.`);
+  } catch (err) {
+    console.error('handleAddCleaner →', err);
+    alert('Failed to add cleaner. Check Firestore rules.');
+  }
+};
 
   const handleDeleteCleaner = async id => {
     if (!window.confirm('Remove this staff member?')) return;
