@@ -695,7 +695,6 @@ const handleAddCleaner = async (payload) => {
           </div>
         </div>
       </div>
-
       {/* ── Assign Cleaner Modal ── */}
       {assignModalTask && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'0 16px' }}>
@@ -733,7 +732,7 @@ const handleAddCleaner = async (payload) => {
           onViewImage={setLightboxImage}
         />
       )}
-
+    
       {/* ── Image Lightbox ── */}
       <ImageLightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />
     </div>
