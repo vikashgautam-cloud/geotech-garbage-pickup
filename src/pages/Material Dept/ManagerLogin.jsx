@@ -1,7 +1,4 @@
-/**
- * ManagerLogin.jsx — Department Manager Authentication
- * Clean minimal government design
- */
+
 import React, { useState } from 'react';
 import { db } from '../../utils/firebase';
 import { doc, getDoc } from 'firebase/firestore';

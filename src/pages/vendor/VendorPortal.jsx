@@ -691,7 +691,6 @@ const handleAddCleaner = async (payload) => {
                 </div>
               </>
             )}
-
           </div>
         </div>
       </div>

@@ -26,7 +26,6 @@ export function AppProvider({ children }) {
         return {
           id:          d.id,
           ...data,
-          // ── normalise the image field so every portal reads "photoURL" ──
           photoURL:    data.photoURL || data.image || data.imageUrl || data.photo || '',
           reportedAt:  data.reportedAt?.toDate() || new Date(),
           resolvedAt:  data.resolvedAt ? data.resolvedAt.toDate() : null,
@@ -58,7 +57,7 @@ export function AppProvider({ children }) {
         lat:            parseFloat(newC.lat) || 0,
         lng:            parseFloat(newC.lng) || 0,
         desc:           newC.desc      || '',
-        // ── ONE canonical image field ──
+        
         photoURL:       newC.photoURL  || newC.image || newC.photo || '',
         reportedBy:     newC.reportedBy || 'Citizen (App)',
         // ── station stored as plain string for easy vendor filtering ──
@@ -128,14 +127,12 @@ const DevNav = ({ route, navigate }) => {
 
 /* ── App root ── */
 export default function App() {
-  const [route,      setRoute]    = useState(window.location.pathname);
-  const [matSession, setMatState] = useState(() => { try { return JSON.parse(localStorage.getItem('matSession')); } catch { return null; } });
+  const [route, setRoute] = useState(window.location.pathname);
 
-  const setMatSession = s => {
-    if (s) localStorage.setItem('matSession', JSON.stringify(s));
-    else   localStorage.removeItem('matSession');
-    setMatState(s);
-  };
+  // FIX: no localStorage persistence anymore — this now behaves exactly
+  // like Vendor Portal: a page reload always clears the session and
+  // asks for fresh login again, for BOTH Material Dept and Material Worker.
+  const [matSession, setMatSession] = useState(null);
 
   const navigate = path => { window.history.pushState({}, '', path); setRoute(path); };
 
@@ -167,7 +164,11 @@ function RouteEngine({ path, matSession, setMatSession }) {
   if (path === '/cleaner') return <CleanerPortal />;
 
   if (path === '/material-dept' || path === '/material-worker') {
-    if (matSession) {
+    // FIX: a saved session is only valid for the route it was created on.
+    // Earlier this just checked "if (matSession)" without comparing it to
+    // the current path — so a Manager session would still render the
+    // MaterialDept dashboard even while sitting on /material-worker.
+    if (matSession && matSession.route === path) {
       return matSession.route === '/material-dept'
         ? <MaterialDept   preAuthUser={matSession.user} onLogout={() => setMatSession(null)} />
         : <MaterialWorker preAuthUser={matSession.user} onLogout={() => setMatSession(null)} />;

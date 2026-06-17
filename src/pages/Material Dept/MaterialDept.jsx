@@ -1,6 +1,11 @@
 /**
  * MaterialDept.jsx — Manager Dashboard
  * Fixed: scroll lock, worker area alignment, all features working
+ * FIX: vendorDocId/vendorId now use preAuthUser.id FIRST (the real vendor
+ * login document ID), not preAuthUser.area (just a display name). Using
+ * area as a Firestore path segment created workers/materials under a
+ * "phantom" vendor document that never actually existed, so WorkerLogin's
+ * vendor-listing query could never find them — causing "No account found".
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../App';
@@ -449,10 +454,13 @@ function TransactionsView({ transactions, onPhoto, t }) {
   </>;
 }
 
-// FIX: WorkersView uses preAuthUser.area (the vendor doc ID) consistently
+// FIX: WorkersView now uses preAuthUser.id FIRST (the actual vendor login
+// document ID) as the Firestore path for storing workers. Previously this
+// used `area` first — a human-readable area name, not a real document ID —
+// which created workers under a vendor path that never genuinely existed,
+// so WorkerLogin.jsx (which lists real vendor docs) could never find them.
 function WorkersView({ transactions, preAuthUser, t }) {
-  // Use area first (set from targetArea/areaName), fall back to id (the vendor doc ID)
-  const vendorDocId = (preAuthUser?.area || preAuthUser?.id || '').trim();
+  const vendorDocId = (preAuthUser?.id || preAuthUser?.area || '').trim();
   const [wName,  setWName]  = useState('');
   const [wLogin, setWLogin] = useState('');
   const [wPwd,   setWPwd]   = useState('');
@@ -590,8 +598,9 @@ function RequestsView({ requests, onApprove, onReject, t }) {
   </>;
 }
 
+// FIX: same priority fix as WorkersView — id first, area as fallback.
 function MaterialsView({ preAuthUser, t }) {
-  const vendorId = (preAuthUser?.area || preAuthUser?.id || '').trim();
+  const vendorId = (preAuthUser?.id || preAuthUser?.area || '').trim();
   const [types, setTypes] = useState([]);
   const [name,  setName]  = useState('');
   const [unit,  setUnit]  = useState('');
