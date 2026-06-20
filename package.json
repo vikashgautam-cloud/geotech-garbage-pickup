@@ -4,6 +4,8 @@
   "description": "GeoTech Railway Waste Management System - Government of India",
   "private": true,
   "dependencies": {
+    "@tabler/icons-react": "^3.44.0",
+    "@tabler/icons-webfont": "^3.44.0",
     "ajv": "^8.20.0",
     "firebase": "^12.13.0",
     "leaflet": "^1.9.4",
