@@ -164,10 +164,7 @@ function RouteEngine({ path, matSession, setMatSession }) {
   if (path === '/cleaner') return <CleanerPortal />;
 
   if (path === '/material-dept' || path === '/material-worker') {
-    // FIX: a saved session is only valid for the route it was created on.
-    // Earlier this just checked "if (matSession)" without comparing it to
-    // the current path — so a Manager session would still render the
-    // MaterialDept dashboard even while sitting on /material-worker.
+   
     if (matSession && matSession.route === path) {
       return matSession.route === '/material-dept'
         ? <MaterialDept   preAuthUser={matSession.user} onLogout={() => setMatSession(null)} />
