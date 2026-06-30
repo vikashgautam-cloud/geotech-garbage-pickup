@@ -1,7 +1,4 @@
-/**
- * WorkerLogin.jsx — Field Worker Authentication
- * Clean minimal government design
- */
+
 import React, { useState } from 'react';
 import { db } from '../../utils/firebase';
 import { collection, getDoc, getDocs, query, where, doc } from 'firebase/firestore';

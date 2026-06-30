@@ -80,7 +80,7 @@ export function Table({ headers, rows }) {
           <tr>{headers.map(h=>(
             <th key={h} style={{ textAlign:'left', padding:'8px 12px', fontSize:10.5, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.5px', borderBottom:`1px solid ${C.border}`, background:C.surface, whiteSpace:'nowrap' }}>{h}</th>
           ))}</tr>
-        </thead>
+        </thea;d>
         <tbody>
           {rows.map((row,i)=>(
             <tr key={i} style={{ cursor:row.onClick?'pointer':'default' }} onClick={row.onClick}
